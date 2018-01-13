@@ -1,11 +1,15 @@
 import bc.Direction;
 import bc.GameController;
+import bc.MapLocation;
+import bc.Planet;
 import bc.Unit;
 import bc.VecUnit;
 
+import java.awt.Point;
+
 public class EarthPlayer extends PlanetPlayer {
-    public EarthPlayer(GameController gc) {
-        super(gc);
+    public EarthPlayer(GameController gc, Planet planet) {
+        super(gc, planet);
     }
 
     @Override
@@ -16,8 +20,16 @@ public class EarthPlayer extends PlanetPlayer {
             Unit unit = units.get(i);
 
             // Most methods on gc take unit IDs, instead of the unit objects themselves.
-            if (this.gc.isMoveReady(unit.id()) && this.gc.canMove(unit.id(), Direction.Southeast)) {
-                this.gc.moveRobot(unit.id(), Direction.Southeast);
+            // if (this.gc.isMoveReady(unit.id()) && this.gc.canMove(unit.id(), Direction.Southeast)) {
+            //     this.gc.moveRobot(unit.id(), Direction.Southeast);
+            // }
+            Direction[][] navMap = this.navMaps.get(new Point(10, 10));
+            MapLocation loc = unit.location().mapLocation();
+            int unitX = loc.getX();
+            int unitY = loc.getY();
+            Direction nextDir = navMap[unitY][unitX];
+            if (this.gc.isMoveReady(unit.id()) && this.gc.canMove(unit.id(), nextDir)) {
+                this.gc.moveRobot(unit.id(), nextDir);
             }
         }
     }

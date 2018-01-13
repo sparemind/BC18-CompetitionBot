@@ -1,6 +1,9 @@
 import bc.GameController;
 import bc.Planet;
 
+/*
+ * TODO: Update the ==0, ==1 checks when methods are updated to return booleans
+ */
 public class Player {
     // This player's game controller
     protected GameController gc;
@@ -16,9 +19,9 @@ public class Player {
 
         Planet planet = this.gc.planet();
         if (planet == Planet.Earth) {
-            this.player = new EarthPlayer(this.gc);
+            this.player = new EarthPlayer(this.gc, planet);
         } else {
-            this.player = new MarsPlayer(this.gc);
+            this.player = new MarsPlayer(this.gc, planet);
         }
     }
 

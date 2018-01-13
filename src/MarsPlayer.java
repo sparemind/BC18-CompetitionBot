@@ -1,8 +1,9 @@
 import bc.GameController;
+import bc.Planet;
 
 public class MarsPlayer extends PlanetPlayer {
-    public MarsPlayer(GameController gc) {
-        super(gc);
+    public MarsPlayer(GameController gc, Planet planet) {
+        super(gc, planet);
     }
 
     @Override
