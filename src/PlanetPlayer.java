@@ -1,16 +1,12 @@
-import bc.Direction;
-import bc.GameController;
-import bc.MapLocation;
-import bc.Planet;
-import bc.PlanetMap;
-import bc.Team;
-import bc.bc;
+import bc.*;
 
 import java.awt.Point;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 public abstract class PlanetPlayer {
     // Initial time in the time pool in milliseconds (10 seconds)
@@ -23,6 +19,8 @@ public abstract class PlanetPlayer {
     static final int IMPASSABLE = -1;
     // What team this player is on
     protected final Team MY_TEAM;
+    // What team the enemy is
+    protected final Team ENEMY_TEAM;
     // This player's game controller
     protected GameController gc;
     // Number of milliseconds remaining in the time pool
@@ -33,6 +31,10 @@ public abstract class PlanetPlayer {
     // karbonite at each location. -1 signifies impassable terrain.
     protected int[][] map;
     protected Map<Point, Direction[][]> navMaps;
+    // Key: UnitID, Value: Unit
+    protected Map<Integer, Unit> allUnits;
+    // Key: UnitType, Value: Set of all my units of that type
+    protected Map<UnitType, Set<Integer>> myUnits;
 
     /**
      * Creates a new player.
@@ -44,6 +46,11 @@ public abstract class PlanetPlayer {
         this.turnStartTimestampMillis = System.currentTimeMillis();
         this.gc = gc;
         this.MY_TEAM = gc.team();
+        if (this.MY_TEAM == Team.Blue) {
+            this.ENEMY_TEAM = Team.Red;
+        } else {
+            this.ENEMY_TEAM = Team.Blue;
+        }
         this.timePool = INITIAL_TIME;
 
         // Create karbonite map
@@ -90,7 +97,7 @@ public abstract class PlanetPlayer {
                         MapLocation adj = next.add(d);
                         int adjX = adj.getX();
                         int adjY = adj.getY();
-                        if (adjX < 0 || adjY < 0 || adjX >= this.map[y].length || adjY >= this.map.length || this.map[adjY][adjX] == IMPASSABLE) {
+                        if (isOOB(adjX, adjY) || this.map[adjY][adjX] == IMPASSABLE) {
                             continue;
                         }
                         if (navMap[adjY][adjX] == null) {
@@ -103,6 +110,15 @@ public abstract class PlanetPlayer {
             }
         }
 
+        // Set up unit lookup map
+        this.allUnits = new HashMap<>();
+
+        // Set up units map
+        this.myUnits = new HashMap<>();
+        for (UnitType type : UnitType.values()) {
+            this.myUnits.put(type, new HashSet<>());
+        }
+
         this.timePool = getTimeLeft();
     }
 
@@ -112,6 +128,19 @@ public abstract class PlanetPlayer {
     public void processPreTurn() {
         this.timePool += TIME_INCREMENT;
         this.turnStartTimestampMillis = System.currentTimeMillis();
+
+        // Update unit maps
+        for (UnitType type : this.myUnits.keySet()) {
+            this.myUnits.get(type).clear();
+        }
+        VecUnit units = this.gc.units();
+        for (int i = 0; i < units.size(); i++) {
+            Unit unit = units.get(i);
+            if (unit.team() == this.MY_TEAM) {
+                this.myUnits.get(unit.unitType()).add(unit.id());
+            }
+            this.allUnits.put(unit.id(), unit);
+        }
     }
 
     /**
@@ -136,5 +165,16 @@ public abstract class PlanetPlayer {
     public long getTimeLeft() {
         // Subtract an extra millisecond to "round down" and give a safer estimate
         return this.timePool - (System.currentTimeMillis() - this.turnStartTimestampMillis) - 1;
+    }
+
+    /**
+     * Returns whether a given location is out of bounds.
+     *
+     * @param x The x-coordinate of the location to check.
+     * @param y The y-coordinate of the location to check.
+     * @return True if the location is out of bounds, false otherwise.
+     */
+    protected boolean isOOB(int x, int y) {
+        return x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length;
     }
 }

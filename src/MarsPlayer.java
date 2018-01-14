@@ -1,5 +1,4 @@
-import bc.GameController;
-import bc.Planet;
+import bc.*;
 
 public class MarsPlayer extends PlanetPlayer {
     public MarsPlayer(GameController gc, Planet planet) {
