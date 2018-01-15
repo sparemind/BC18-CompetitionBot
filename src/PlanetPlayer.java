@@ -9,11 +9,7 @@ import java.util.Queue;
 import java.util.Set;
 
 public abstract class PlanetPlayer {
-    // Initial time in the time pool in milliseconds (10 seconds)
-    static final int INITIAL_TIME = 10 * 1000;
-    // Number of milliseconds added to the time pool each turn
-    static final int TIME_INCREMENT = 50;
-    static final Direction[] DIRECTIONS = Direction.values();
+    static final Direction[] DIRECTIONS = {Direction.North, Direction.Northeast, Direction.East, Direction.Southeast, Direction.South, Direction.Southwest, Direction.West, Direction.Northwest};
 
     // Represents impassable terrain in the game map.
     static final int IMPASSABLE = -1;
@@ -23,10 +19,6 @@ public abstract class PlanetPlayer {
     protected final Team ENEMY_TEAM;
     // This player's game controller
     protected GameController gc;
-    // Number of milliseconds remaining in the time pool
-    protected long timePool;
-    // Timestamp of the turn start in milliseconds
-    protected long turnStartTimestampMillis;
     // Map of all locations on the planet, represented as the amount of
     // karbonite at each location. -1 signifies impassable terrain.
     protected int[][] map;
@@ -43,7 +35,6 @@ public abstract class PlanetPlayer {
      * @param planet The planet this player is on.
      */
     public PlanetPlayer(GameController gc, Planet planet) {
-        this.turnStartTimestampMillis = System.currentTimeMillis();
         this.gc = gc;
         this.MY_TEAM = gc.team();
         if (this.MY_TEAM == Team.Blue) {
@@ -51,7 +42,6 @@ public abstract class PlanetPlayer {
         } else {
             this.ENEMY_TEAM = Team.Blue;
         }
-        this.timePool = INITIAL_TIME;
 
         // Create karbonite map
         PlanetMap pm = gc.startingMap(planet);
@@ -118,17 +108,12 @@ public abstract class PlanetPlayer {
         for (UnitType type : UnitType.values()) {
             this.myUnits.put(type, new HashSet<>());
         }
-
-        this.timePool = getTimeLeft();
     }
 
     /**
      * Processes any actions that must happen before a turn.
      */
     public void processPreTurn() {
-        this.timePool += TIME_INCREMENT;
-        this.turnStartTimestampMillis = System.currentTimeMillis();
-
         // Update unit maps
         for (UnitType type : this.myUnits.keySet()) {
             this.myUnits.get(type).clear();
@@ -152,19 +137,7 @@ public abstract class PlanetPlayer {
      * Processes any actions that must happen at the end of a turn.
      */
     public void processPostTurn() {
-        this.timePool = getTimeLeft();
-        System.out.println("Ending round " + this.gc.round() + " with " + this.timePool + "ms remaining.");
-    }
-
-    /**
-     * Returns an estimate the amount of time left in the time pool.
-     *
-     * @return The number of milliseconds left in this player's time pool,
-     * rounded down.
-     */
-    public long getTimeLeft() {
-        // Subtract an extra millisecond to "round down" and give a safer estimate
-        return this.timePool - (System.currentTimeMillis() - this.turnStartTimestampMillis) - 1;
+        System.out.println("Ending round " + this.gc.round() + " with " + this.gc.getTimeLeftMs() + "ms remaining.");
     }
 
     /**

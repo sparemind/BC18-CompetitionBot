@@ -1,5 +1,4 @@
-import bc.GameController;
-import bc.Planet;
+import bc.*;
 
 /*
  * TODO: Update the ==0, ==1 checks when methods are updated to return booleans
