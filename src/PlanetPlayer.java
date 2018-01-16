@@ -22,6 +22,8 @@ public abstract class PlanetPlayer {
     // Map of all locations on the planet, represented as the amount of
     // karbonite at each location. -1 signifies impassable terrain.
     protected int[][] map;
+    protected int mapWidth;
+    protected int mapHeight;
     protected Map<Point, Direction[][]> navMaps;
     // Key: UnitID, Value: Unit
     protected Map<Integer, Unit> allUnits;
@@ -45,7 +47,9 @@ public abstract class PlanetPlayer {
 
         // Create karbonite map
         PlanetMap pm = gc.startingMap(planet);
-        this.map = new int[(int) pm.getHeight()][(int) pm.getWidth()];
+        this.mapWidth = (int) pm.getWidth();
+        this.mapHeight = (int) pm.getHeight();
+        this.map = new int[this.mapHeight][this.mapWidth];
         this.navMaps = new HashMap<>();
         for (int y = 0; y < this.map.length; y++) {
             for (int x = 0; x < this.map[y].length; x++) {
@@ -62,9 +66,9 @@ public abstract class PlanetPlayer {
         for (int y = 0; y < this.map.length; y++) {
             for (int x = 0; x < this.map[y].length; x++) {
                 // Skip making a navmap if this location is impassable
-                // if (this.map[y][x] == IMPASSABLE) {
-                //     continue;
-                // }
+                if (this.map[y][x] == IMPASSABLE) {
+                    continue;
+                }
 
                 MapLocation start = new MapLocation(planet, x, y);
                 Queue<MapLocation> openSet = new LinkedList<>();
@@ -108,6 +112,8 @@ public abstract class PlanetPlayer {
         for (UnitType type : UnitType.values()) {
             this.myUnits.put(type, new HashSet<>());
         }
+
+        System.out.println("Ending initialization with " + gc.getTimeLeftMs() + "ms remaining.");
     }
 
     /**
@@ -148,6 +154,6 @@ public abstract class PlanetPlayer {
      * @return True if the location is out of bounds, false otherwise.
      */
     protected boolean isOOB(int x, int y) {
-        return x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length;
+        return x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight;
     }
 }

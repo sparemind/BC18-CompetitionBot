@@ -1,11 +1,105 @@
 import bc.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class EarthPlayer extends PlanetPlayer {
+    // "Radius" of square
+    private static final int DEPOSIT_SCAN_RADIUS = 1;
+    // In squared units
+    private static final int POD_SCAN_RADIUS = 4;
+
+    private int[][] depositMap;
+    // Key: UnitID, Value: Pod of UnitIDs
+    private Map<Integer, Set<Integer>> podsMap;
+    // All worker pods
+    private List<Set<Integer>> pods;
+
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
+
+        findKarboniteDeposits();
+        makePods();
+        assignInitialPods();
+    }
+
+    private void findKarboniteDeposits() {
+        this.depositMap = new int[this.mapHeight][this.mapWidth];
+        int maxDepositValue = 0;
+
+        for (int y = 0; y < this.mapHeight; y++) {
+            for (int x = 0; x < this.mapWidth; x++) {
+                // Don't calculate deposits for impassable locations
+                if (this.map[y][x] == IMPASSABLE) {
+                    continue;
+                }
+                for (int i = -DEPOSIT_SCAN_RADIUS; i <= DEPOSIT_SCAN_RADIUS; i++) {
+                    for (int j = -DEPOSIT_SCAN_RADIUS; j <= DEPOSIT_SCAN_RADIUS; j++) {
+                        int yPos = y + i;
+                        int xPos = x + j;
+                        if (isOOB(xPos, yPos)) {
+                            continue;
+                        }
+                        // Don't add impassable locations to the total
+                        if (this.map[yPos][xPos] == IMPASSABLE) {
+                            continue;
+                        }
+                        this.depositMap[y][x] += this.map[yPos][xPos];
+                    }
+                }
+                maxDepositValue = Math.max(maxDepositValue, this.depositMap[y][x]);
+            }
+        }
+    }
+
+    private void makePods() {
+        this.podsMap = new HashMap<>();
+        this.pods = new ArrayList<>();
+
+        Set<Integer> processed = new HashSet<>();
+
+        // Process every unit
+        VecUnit myUnits = this.gc.myUnits();
+        for (int i = 0; i < myUnits.size(); i++) {
+            HashSet<Integer> pod = new HashSet<>();
+            addToPod(myUnits.get(i), pod, processed);
+            if (!pod.isEmpty()) {
+                this.pods.add(pod);
+            }
+        }
+
+        System.out.println(this.pods.size() + " pods.");
+        for (Set<Integer> pod : this.pods) {
+            System.out.println(pod);
+        }
+        System.out.println();
+    }
+
+    private void addToPod(Unit unit, Set<Integer> pod, Set<Integer> processed) {
+        if (processed.contains(unit.id())) {
+            return;
+        }
+
+        processed.add(unit.id());
+        pod.add(unit.id());
+        this.podsMap.put(unit.id(), pod);
+
+        VecUnit nearbyUnits = this.gc.senseNearbyUnitsByTeam(unit.location().mapLocation(), POD_SCAN_RADIUS, this.MY_TEAM);
+        for (int i = 0; i < nearbyUnits.size(); i++) {
+            addToPod(nearbyUnits.get(i), pod, processed);
+        }
+    }
+
+    private void assignInitialPods() {
+        if (this.pods.size() == 1) {
+
+        } else {
+
+        }
     }
 
     @Override
@@ -27,7 +121,6 @@ public class EarthPlayer extends PlanetPlayer {
         //     }
         //
         // }
-
         for (int worker : this.myUnits.get(UnitType.Worker)) {
             // if (this.gc.karbonite() > bc.bcUnitTypeBlueprintCost(UnitType.Factory)) {
             Unit workerUnit = this.allUnits.get(worker);
