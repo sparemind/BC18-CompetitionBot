@@ -10,6 +10,18 @@ import java.util.Set;
 
 public abstract class PlanetPlayer {
     static final Direction[] DIRECTIONS = {Direction.North, Direction.Northeast, Direction.East, Direction.Southeast, Direction.South, Direction.Southwest, Direction.West, Direction.Northwest};
+    static Map<Direction, Point> DIR_VECTORS = new HashMap<>();
+
+    static {
+        DIR_VECTORS.put(Direction.North, new Point(0, 1));
+        DIR_VECTORS.put(Direction.Northeast, new Point(1, 1));
+        DIR_VECTORS.put(Direction.East, new Point(1, 0));
+        DIR_VECTORS.put(Direction.Southeast, new Point(1, -1));
+        DIR_VECTORS.put(Direction.South, new Point(0, -1));
+        DIR_VECTORS.put(Direction.Southwest, new Point(-1, -1));
+        DIR_VECTORS.put(Direction.West, new Point(-1, 0));
+        DIR_VECTORS.put(Direction.Northwest, new Point(-1, 1));
+    }
 
     // Represents impassable terrain in the game map.
     static final int IMPASSABLE = -1;
