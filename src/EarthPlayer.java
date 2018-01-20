@@ -1,6 +1,5 @@
 import bc.*;
 
-import java.awt.Point;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,13 +20,57 @@ public class EarthPlayer extends PlanetPlayer {
     // All worker pods
     private List<Set<Integer>> pods;
     private Map<Set<Integer>, Order> podOrders;
+    private Navigator navigator;
 
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
 
+        initializeNavigator();
         // findKarboniteDeposits();
         // makePods();
         // assignInitialPods();
+    }
+
+    private void initializeNavigator() {
+        this.navigator = new Navigator(this.gc);
+
+        boolean verticalSymmetry = true;
+        boolean horizontalSymmetry = true;
+        boolean rotatedSymmetry = true;
+        boolean[][] passable = new boolean[this.mapHeight][this.mapWidth];
+        for (int y = 0; y < this.mapHeight; y++) {
+            for (int x = 0; x < this.mapWidth; x++) {
+                passable[y][x] = this.map[y][x] != IMPASSABLE;
+            }
+        }
+
+        for (int y = 0; y < this.mapHeight; y++) {
+            for (int x = 0; x < this.mapWidth; x++) {
+                int mirrorX = this.mapWidth - 1 - x;
+                int mirrorY = this.mapHeight - 1 - y;
+                if (verticalSymmetry && passable[y][x] != passable[mirrorY][x]) {
+                    verticalSymmetry = false;
+                }
+                if (horizontalSymmetry && passable[y][x] != passable[y][mirrorX]) {
+                    horizontalSymmetry = false;
+                }
+                if (rotatedSymmetry && passable[y][x] != passable[mirrorY][mirrorX]) {
+                    rotatedSymmetry = false;
+                }
+            }
+        }
+
+        Navigator.Symmetry symmetry;
+        if (verticalSymmetry) {
+            symmetry = Navigator.Symmetry.VERTICAL;
+        } else if (horizontalSymmetry) {
+            symmetry = Navigator.Symmetry.HORIZONTAL;
+        } else {
+            symmetry = Navigator.Symmetry.ROTATED;
+        }
+        System.out.println(verticalSymmetry + ":" + horizontalSymmetry + ":" + rotatedSymmetry);
+
+        this.navigator.precomputeNavMaps(passable, this.gc.planet(), symmetry);
     }
 
     private void findKarboniteDeposits() {
@@ -144,32 +187,26 @@ public class EarthPlayer extends PlanetPlayer {
             Unit workerUnit = this.allUnits.get(worker);
             MapLocation loc = workerUnit.location().mapLocation();
 
-            Navigator nav = new Navigator();
-            boolean[][] navMap = new boolean[this.mapHeight][this.mapWidth];
-            for (int y = 0; y < this.mapHeight; y++) {
-                for (int x = 0; x < this.mapWidth; x++) {
-                    navMap[y][x] = this.map[y][x] != IMPASSABLE;
-                }
-            }
-            VecUnit allUnits = this.gc.units();
-            for (int i = 0; i < allUnits.size(); i++) {
-                Location l = allUnits.get(i).location();
-                if (l.isOnMap() && !l.isInGarrison()) {
-                    MapLocation ml = l.mapLocation();
-                    navMap[ml.getY()][ml.getX()] = false;
-                }
-            }
-            for (boolean[] b : navMap) {
-                for (boolean bb : b) {
-                    System.out.print(bb ? "." : "#");
-                }
-            }
-            System.out.println();
 
-            Direction toMove = nav.pathfind(new Point(loc.getX(), loc.getY()), new Point(18, 10), navMap);
-            if (toMove != null && this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
-                this.gc.moveRobot(worker, toMove);
-            }
+            // VecUnit allUnits = this.gc.units();
+            // for (int i = 0; i < allUnits.size(); i++) {
+            //     Location l = allUnits.get(i).location();
+            //     if (l.isOnMap() && !l.isInGarrison()) {
+            //         MapLocation ml = l.mapLocation();
+            //         navMap[ml.getY()][ml.getX()] = false;
+            //     }
+            // }
+            // // for (boolean[] b : navMap) {
+            // //     for (boolean bb : b) {
+            // //         System.out.print(bb ? "." : "#");
+            // //     }
+            // // }
+            // // System.out.println();
+            //
+            // Direction toMove = nav.pathfind(new Point(loc.getX(), loc.getY()), new Point(18, 10), navMap);
+            // if (toMove != null && this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
+            //     this.gc.moveRobot(worker, toMove);
+            // }
         }
 
         // VecUnit is a class that you can think of as similar to ArrayList<Unit>, but immutable.
