@@ -12,7 +12,7 @@ public class EarthPlayer extends PlanetPlayer {
     // "Radius" of square
     private static final int DEPOSIT_SCAN_RADIUS = 1;
     // In squared units
-    private static final int POD_SCAN_RADIUS = 4;
+    private static final int POD_SCAN_RADIUS = 16;
 
     private int[][] depositMap;
     // Key: UnitID, Value: Pod of UnitIDs
@@ -32,45 +32,15 @@ public class EarthPlayer extends PlanetPlayer {
     }
 
     private void initializeNavigator() {
-        this.navigator = new Navigator(this.gc);
-
-        boolean verticalSymmetry = true;
-        boolean horizontalSymmetry = true;
-        boolean rotatedSymmetry = true;
         boolean[][] passable = new boolean[this.mapHeight][this.mapWidth];
         for (int y = 0; y < this.mapHeight; y++) {
             for (int x = 0; x < this.mapWidth; x++) {
                 passable[y][x] = this.map[y][x] != IMPASSABLE;
             }
         }
+        this.navigator = new Navigator(this.gc, passable);
 
-        for (int y = 0; y < this.mapHeight; y++) {
-            for (int x = 0; x < this.mapWidth; x++) {
-                int mirrorX = this.mapWidth - 1 - x;
-                int mirrorY = this.mapHeight - 1 - y;
-                if (verticalSymmetry && passable[y][x] != passable[mirrorY][x]) {
-                    verticalSymmetry = false;
-                }
-                if (horizontalSymmetry && passable[y][x] != passable[y][mirrorX]) {
-                    horizontalSymmetry = false;
-                }
-                if (rotatedSymmetry && passable[y][x] != passable[mirrorY][mirrorX]) {
-                    rotatedSymmetry = false;
-                }
-            }
-        }
-
-        Navigator.Symmetry symmetry;
-        if (verticalSymmetry) {
-            symmetry = Navigator.Symmetry.VERTICAL;
-        } else if (horizontalSymmetry) {
-            symmetry = Navigator.Symmetry.HORIZONTAL;
-        } else {
-            symmetry = Navigator.Symmetry.ROTATED;
-        }
-        System.out.println(verticalSymmetry + ":" + horizontalSymmetry + ":" + rotatedSymmetry);
-
-        this.navigator.precomputeNavMaps(passable, this.gc.planet(), symmetry);
+        // this.navigator.precomputeNavMaps(this.gc.planet());
     }
 
     private void findKarboniteDeposits() {
@@ -183,10 +153,20 @@ public class EarthPlayer extends PlanetPlayer {
     public void processTurn() {
 
 
+        int i = 0;
+        MapLocation[] targets = {new MapLocation(Planet.Earth, 18, 4), new MapLocation(Planet.Earth, 18, 15)};
         for (int worker : this.myUnits.get(UnitType.Worker)) {
             Unit workerUnit = this.allUnits.get(worker);
             MapLocation loc = workerUnit.location().mapLocation();
 
+            MapLocation target = targets[i];
+
+            Direction toMove = this.navigator.navigate(worker, loc, target);
+            if (this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
+                this.gc.moveRobot(worker, toMove);
+            }
+
+            i++;
 
             // VecUnit allUnits = this.gc.units();
             // for (int i = 0; i < allUnits.size(); i++) {

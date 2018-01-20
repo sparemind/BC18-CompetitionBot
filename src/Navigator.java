@@ -42,77 +42,204 @@ public class Navigator {
 
     private GameController gc;
     private Map<Point, Direction[][]> navMaps;
+    private Map<Point, int[][]> navMapDists;
+    private boolean[][] passable;
+    private int mapWidth;
+    private int mapHeight;
+    private Symmetry symmetry;
 
-    public Navigator(GameController gc) {
+    public Navigator(GameController gc, boolean[][] passable) {
         this.gc = gc;
         this.navMaps = new HashMap<>();
+        this.navMapDists = new HashMap<>();
+        this.passable = passable;
+        this.mapHeight = this.passable.length;
+        this.mapWidth = this.passable[0].length;
+
+        findSymmetry();
     }
 
-    public void precomputeNavMaps(boolean[][] passable, Planet planet, Symmetry symmetry) {
-        int mapHeight = passable.length;
-        int mapWidth = passable[0].length;
+    // public void precomputeNavMaps(Planet planet) {
+    //     // findSymmetry();
+    //
+    //     // Create nav maps
+    //     for (int y = 0; y < this.mapHeight / 2; y++) {
+    //         for (int x = 0; x < this.mapWidth; x++) {
+    //             // Don't create navigation for an impassable location
+    //             if (!this.passable[y][x]) {
+    //                 continue;
+    //             }
+    //
+    //             MapLocation target = new MapLocation(planet, x, y);
+    //             Queue<MapLocation> openSet = new LinkedList<>();
+    //             Direction[][] navMap = new Direction[this.mapHeight][this.mapWidth];
+    //             Direction[][] symNavMap = new Direction[this.mapHeight][this.mapWidth];
+    //
+    //             openSet.add(target);
+    //             while (!openSet.isEmpty()) {
+    //                 MapLocation next = openSet.remove();
+    //                 for (Direction d : D_DIRS) {
+    //                     MapLocation adj = next.add(d);
+    //                     int adjX = adj.getX();
+    //                     int adjY = adj.getY();
+    //                     if (isOOB(adjX, adjY) || !this.passable[adjY][adjX]) {
+    //                         continue;
+    //                     }
+    //                     if (navMap[adjY][adjX] == null) {
+    //                         openSet.add(adj);
+    //
+    //                         Direction navDir = bc.bcDirectionOpposite(d);
+    //                         navMap[adjY][adjX] = navDir;
+    //
+    //                         switch (this.symmetry) {
+    //                         case VERTICAL:
+    //     symNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
+    //     navMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[next.getY()][next.getX()] + 1;
+    //                             break;
+    //                         case HORIZONTAL:
+    //     symNavMap[y][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
+    //                             break;
+    //                         case ROTATED:
+    //     symNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
+    //                             break;
+    // }
+    //                     }
+    //                 }
+    //             }
+    //             this.navMaps.put(new Point(x, y), navMap);
+    //             switch (this.symmetry) {
+    //                 case VERTICAL:
+    //                     this.navMaps.put(new Point(x, this.mapHeight - 1 - y), symNavMap);
+    //                     break;
+    //                 case HORIZONTAL:
+    //                     this.navMaps.put(new Point(this.mapWidth - 1 - x, y), symNavMap);
+    //                     break;
+    //                 case ROTATED:
+    //                     this.navMaps.put(new Point(this.mapWidth - 1 - x, this.mapHeight - 1 - y), symNavMap);
+    //                     break;
+    //             }
+    //         }
+    //     }
+    // }
 
-        // Create nav maps
-        for (int y = 0; y < mapHeight / 2; y++) {
-            for (int x = 0; x < mapWidth; x++) {
-                // Don't create navigation for an impassable location
-                if (!passable[y][x]) {
-                    continue;
+    private void findSymmetry() {
+        boolean verticalSymmetry = true;
+        boolean horizontalSymmetry = true;
+        boolean rotatedSymmetry = true;
+        for (int y = 0; y < this.mapHeight; y++) {
+            for (int x = 0; x < this.mapWidth; x++) {
+                int mirrorX = this.mapWidth - 1 - x;
+                int mirrorY = this.mapHeight - 1 - y;
+                if (verticalSymmetry && this.passable[y][x] != this.passable[mirrorY][x]) {
+                    verticalSymmetry = false;
                 }
-
-                MapLocation target = new MapLocation(planet, x, y);
-                Queue<MapLocation> openSet = new LinkedList<>();
-                Direction[][] navMap = new Direction[mapHeight][mapWidth];
-                Direction[][] symNavMap = new Direction[mapHeight][mapWidth];
-
-                openSet.add(target);
-                while (!openSet.isEmpty()) {
-                    MapLocation next = openSet.remove();
-                    for (Direction d : D_DIRS) {
-                        MapLocation adj = next.add(d);
-                        int adjX = adj.getX();
-                        int adjY = adj.getY();
-                        if (isOOB(adjX, adjY, mapWidth, mapHeight) || !passable[y][x]) {
-                            continue;
-                        }
-                        if (navMap[adjY][adjX] == null) {
-                            openSet.add(adj);
-
-                            Direction navDir = bc.bcDirectionOpposite(d);
-                            navMap[adjY][adjX] = navDir;
-
-                            switch (symmetry) {
-                                case VERTICAL:
-                                    symNavMap[mapHeight - 1 - y][x] = DIR_VERT_MIRROR.get(navDir);
-                                    break;
-                                case HORIZONTAL:
-                                    symNavMap[y][mapWidth - 1 - x] = DIR_HORZ_MIRROR.get(navDir);
-                                    break;
-                                case ROTATED:
-                                    symNavMap[mapHeight - 1 - y][mapWidth - 1 - x] = d;
-                                    break;
-                            }
-                        }
-                    }
+                if (horizontalSymmetry && this.passable[y][x] != this.passable[y][mirrorX]) {
+                    horizontalSymmetry = false;
                 }
-                this.navMaps.put(new Point(x, y), navMap);
-                switch (symmetry) {
-                    case VERTICAL:
-                        this.navMaps.put(new Point(x, mapHeight - 1 - y), symNavMap);
-                        break;
-                    case HORIZONTAL:
-                        this.navMaps.put(new Point(mapWidth - 1 - x, y), symNavMap);
-                        break;
-                    case ROTATED:
-                        this.navMaps.put(new Point(mapWidth - 1 - x, mapHeight - 1 - y), symNavMap);
-                        break;
+                if (rotatedSymmetry && this.passable[y][x] != this.passable[mirrorY][mirrorX]) {
+                    rotatedSymmetry = false;
                 }
             }
         }
+
+        if (verticalSymmetry) {
+            this.symmetry = Navigator.Symmetry.VERTICAL;
+        } else if (horizontalSymmetry) {
+            this.symmetry = Navigator.Symmetry.HORIZONTAL;
+        } else {
+            this.symmetry = Navigator.Symmetry.ROTATED;
+        }
+        System.out.println("Symmetry: " + verticalSymmetry + ":" + horizontalSymmetry + ":" + rotatedSymmetry);
     }
 
-    private boolean isOOB(int x, int y, int width, int height) {
-        return x < 0 || y < 0 || x >= width || y >= height;
+    private boolean isOOB(int x, int y) {
+        return x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight;
+    }
+
+    public Direction navigate(int unitID, MapLocation start, MapLocation target) {
+        Point targetPoint = new Point(target.getX(), target.getY());
+        if (!this.navMaps.containsKey(targetPoint)) {
+            createNavMap(target);
+        }
+        Direction nextDir = this.navMaps.get(targetPoint)[start.getY()][start.getX()];
+        if (nextDir == null) {
+            return Direction.Center;
+        }
+
+        return nextDir;
+    }
+
+    private void createNavMap(MapLocation target) {
+        int x = target.getX();
+        int y = target.getY();
+        Point targetPoint = new Point(x, y);
+
+        Queue<MapLocation> openSet = new LinkedList<>();
+        Direction[][] navMap = new Direction[this.mapHeight][this.mapWidth];
+        Direction[][] symNavMap = new Direction[this.mapHeight][this.mapWidth];
+        int[][] navMapDist = new int[this.mapHeight][this.mapWidth];
+
+        navMap[y][x] = Direction.Center;
+        switch (this.symmetry) {
+            case VERTICAL:
+                symNavMap[this.mapHeight - 1 - y][x] = Direction.Center;
+                break;
+            case HORIZONTAL:
+                symNavMap[y][this.mapWidth - 1 - x] = Direction.Center;
+                break;
+            case ROTATED:
+                symNavMap[this.mapHeight - 1 - y][this.mapWidth - 1 - x] = Direction.Center;
+                break;
+        }
+
+        openSet.add(target);
+        while (!openSet.isEmpty()) {
+            MapLocation next = openSet.remove();
+            for (Direction d : D_DIRS) {
+                MapLocation adj = next.add(d);
+                int adjX = adj.getX();
+                int adjY = adj.getY();
+                if (isOOB(adjX, adjY) || !this.passable[adjY][adjX]) {
+                    continue;
+                }
+                if (navMap[adjY][adjX] == null) {
+                    openSet.add(adj);
+
+                    Direction navDir = bc.bcDirectionOpposite(d);
+                    navMap[adjY][adjX] = navDir;
+                    navMapDist[adjY][adjX] = navMapDist[next.getY()][next.getX()] + 1;
+
+                    switch (this.symmetry) {
+                        case VERTICAL:
+                            symNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
+                            navMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX] + 1;
+                            break;
+                        case HORIZONTAL:
+                            symNavMap[y][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
+                            navMapDist[y][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX] + 1;
+                            break;
+                        case ROTATED:
+                            symNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
+                            navMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX] + 1;
+                            break;
+                    }
+                }
+            }
+        }
+        this.navMaps.put(targetPoint, navMap);
+        this.navMapDists.put(targetPoint, navMapDist);
+
+        switch (this.symmetry) {
+            case VERTICAL:
+                this.navMaps.put(new Point(x, this.mapHeight - 1 - y), symNavMap);
+                break;
+            case HORIZONTAL:
+                this.navMaps.put(new Point(this.mapWidth - 1 - x, y), symNavMap);
+                break;
+            case ROTATED:
+                this.navMaps.put(new Point(this.mapWidth - 1 - x, this.mapHeight - 1 - y), symNavMap);
+                break;
+        }
     }
 
     public Direction pathfind(Point start, Point target, boolean[][] map) {
