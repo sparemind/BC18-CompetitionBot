@@ -157,23 +157,23 @@ public class EarthPlayer extends PlanetPlayer {
         // MapLocation[] targets = {new MapLocation(Planet.Earth, 18, 4), new MapLocation(Planet.Earth, 18, 15)};
         MapLocation[] targets = {new MapLocation(Planet.Earth, 35, 35)};
 
-        Set<Unit> pod = new HashSet<>();
-        for (int worker : this.myUnits.get(UnitType.Worker)) {
-            pod.add(this.allUnits.get(worker));
-        }
-        this.navigator.doNavigate(pod, targets[0]);
+        // Set<Unit> pod = new HashSet<>();
+        // for (int worker : this.myUnits.get(UnitType.Worker)) {
+        //     pod.add(this.allUnits.get(worker));
+        // }
+        // this.navigator.doNavigate(pod, targets[0]);
 
         for (int worker : this.myUnits.get(UnitType.Worker)) {
-            // Unit workerUnit = this.allUnits.get(worker);
-            // MapLocation loc = workerUnit.location().mapLocation();
-            //
-            // MapLocation target = targets[i % targets.length];
-            //
-            // Direction toMove = this.navigator.navigate(worker, loc, target);
-            // if (this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
-            //     this.gc.moveRobot(worker, toMove);
-            // }
-            // i++;
+            Unit workerUnit = this.allUnits.get(worker);
+            MapLocation loc = workerUnit.location().mapLocation();
+
+            MapLocation target = targets[i % targets.length];
+
+            Direction toMove = this.navigator.navigate(worker, loc, target);
+            if (this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
+                this.gc.moveRobot(worker, toMove);
+            }
+            i++;
 
 
             // VecUnit allUnits = this.gc.units();

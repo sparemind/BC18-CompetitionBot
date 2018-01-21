@@ -14,6 +14,7 @@ public class Navigator {
     static final Map<Direction, Integer> DIR_VAL = new HashMap<>();
     private static final double SQRT2 = Math.sqrt(2.0);
     private static final double A_STAR_WEIGHT = 1.0;
+    private static final int LOOKAHEAD_DISTANCE = 3;
     private static final Direction[] D_DIRS = {Direction.Northeast, Direction.Southeast, Direction.Southwest, Direction.Northwest, Direction.North, Direction.East, Direction.South, Direction.West};
     private static final Map<Direction, Direction> DIR_HORZ_MIRROR = new HashMap<>();
     private static final Map<Direction, Direction> DIR_VERT_MIRROR = new HashMap<>();
@@ -217,11 +218,16 @@ public class Navigator {
             return nextDir;
         }
 
+        MapLocation lookaheadPoint = start;
+        for (int i = 0; i < LOOKAHEAD_DISTANCE; i++) {
+            lookaheadPoint = lookaheadPoint.add(this.navMaps.get(targetPoint)[lookaheadPoint.getY()][lookaheadPoint.getX()]);
+        }
+
         // If not possible, try turning slightly left or right and see if a spot
         // is open that is closer to the target.
         Direction bestAdjustedDir = Direction.Center;
         // long bestAdjustedDirDist = Integer.MAX_VALUE; // Use this for back and forth motion instead
-        long bestAdjustedDirDist = start.distanceSquaredTo(target);
+        long bestAdjustedDirDist = start.distanceSquaredTo(lookaheadPoint);
         for (int i = 0; i < DIR_ROT_ORDER.length; i++) {
             int index = (DIR_VAL.get(nextDir) + DIR_ROT_ORDER[i] + DIRECTIONS.length) % DIRECTIONS.length;
             Direction adjustedDir = DIRECTIONS[index];
@@ -230,7 +236,7 @@ public class Navigator {
             }
 
             MapLocation newPos = start.add(adjustedDir);
-            long distanceToTarget = newPos.distanceSquaredTo(target);
+            long distanceToTarget = newPos.distanceSquaredTo(lookaheadPoint);
             if (distanceToTarget < bestAdjustedDirDist) {
                 bestAdjustedDir = adjustedDir;
                 bestAdjustedDirDist = distanceToTarget;
