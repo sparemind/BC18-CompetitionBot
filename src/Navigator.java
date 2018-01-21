@@ -55,7 +55,10 @@ public class Navigator {
     private boolean[][] passable;
     private int mapWidth;
     private int mapHeight;
-    private Symmetry symmetry;
+    // private Symmetry symmetry;
+    private boolean isVerticallySymmetric;
+    private boolean isHorizontallySymmetric;
+    private boolean isRotatedSymmetric;
 
     public Navigator(GameController gc, boolean[][] passable) {
         this.gc = gc;
@@ -69,33 +72,33 @@ public class Navigator {
     }
 
     private void findSymmetry() {
-        boolean verticalSymmetry = true;
-        boolean horizontalSymmetry = true;
-        boolean rotatedSymmetry = true;
+        this.isVerticallySymmetric = true;
+        this.isHorizontallySymmetric = true;
+        this.isRotatedSymmetric = true;
         for (int y = 0; y < this.mapHeight; y++) {
             for (int x = 0; x < this.mapWidth; x++) {
                 int mirrorX = this.mapWidth - 1 - x;
                 int mirrorY = this.mapHeight - 1 - y;
-                if (verticalSymmetry && this.passable[y][x] != this.passable[mirrorY][x]) {
-                    verticalSymmetry = false;
+                if (this.isVerticallySymmetric && this.passable[y][x] != this.passable[mirrorY][x]) {
+                    this.isVerticallySymmetric = false;
                 }
-                if (horizontalSymmetry && this.passable[y][x] != this.passable[y][mirrorX]) {
-                    horizontalSymmetry = false;
+                if (this.isHorizontallySymmetric && this.passable[y][x] != this.passable[y][mirrorX]) {
+                    this.isHorizontallySymmetric = false;
                 }
-                if (rotatedSymmetry && this.passable[y][x] != this.passable[mirrorY][mirrorX]) {
-                    rotatedSymmetry = false;
+                if (this.isRotatedSymmetric && this.passable[y][x] != this.passable[mirrorY][mirrorX]) {
+                    this.isRotatedSymmetric = false;
                 }
             }
         }
 
-        if (verticalSymmetry) {
-            this.symmetry = Navigator.Symmetry.VERTICAL;
-        } else if (horizontalSymmetry) {
-            this.symmetry = Navigator.Symmetry.HORIZONTAL;
-        } else {
-            this.symmetry = Navigator.Symmetry.ROTATED;
-        }
-        System.out.println("Symmetry: " + verticalSymmetry + ":" + horizontalSymmetry + ":" + rotatedSymmetry);
+        // if (isVerticallySymmetric) {
+        //     this.symmetry = Navigator.Symmetry.VERTICAL;
+        // } else if (isHorizontallySymmetric) {
+        //     this.symmetry = Navigator.Symmetry.HORIZONTAL;
+        // } else {
+        //     this.symmetry = Navigator.Symmetry.ROTATED;
+        // }
+        System.out.println("Symmetry: " + this.isVerticallySymmetric + ":" + this.isHorizontallySymmetric + ":" + this.isRotatedSymmetric);
     }
 
     // public void precomputeNavMaps(Planet planet) {
@@ -267,28 +270,45 @@ public class Navigator {
 
         Queue<MapLocation> openSet = new LinkedList<>();
         Direction[][] navMap = new Direction[this.mapHeight][this.mapWidth];
-        Direction[][] symNavMap = new Direction[this.mapHeight][this.mapWidth];
-        int[][] navMapDist = new int[this.mapHeight][this.mapWidth];
-        int[][] symNavMapDist = new int[this.mapHeight][this.mapWidth];
+        Direction[][] vertSymNavMap = new Direction[this.mapHeight][this.mapWidth];
+        Direction[][] horzSymNavMap = new Direction[this.mapHeight][this.mapWidth];
+        Direction[][] rotSymNavMap = new Direction[this.mapHeight][this.mapWidth];
+        // int[][] navMapDist = new int[this.mapHeight][this.mapWidth];
+        // int[][] symNavMapDist = new int[this.mapHeight][this.mapWidth];
 
-        Point symmetricPoint = null;
-        switch (this.symmetry) {
-            case VERTICAL:
-                symmetricPoint = new Point(targetX, this.mapHeight - 1 - targetY);
-                break;
-            case HORIZONTAL:
-                symmetricPoint = new Point(this.mapWidth - 1 - targetX, targetY);
-                break;
-            case ROTATED:
-                symmetricPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
-                break;
-        }
+        Point vertSymPoint = new Point(targetX, this.mapHeight - 1 - targetY);
+        Point horzSymPoint = new Point(this.mapWidth - 1 - targetX, targetY);
+        Point rotSymPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
+
+        // Point symmetricPoint = null;
+        // if (this.isVerticallySymmetric) {
+        //     symmetricPoint = new Point(targetX, this.mapHeight - 1 - targetY);
+        // }
+        // if (this.isHorizontallySymmetric) {
+        //     symmetricPoint = new Point(this.mapWidth - 1 - targetX, targetY);
+        // }
+        // if (this.isRotatedSymmetric) {
+        //     symmetricPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
+        // }
+        // switch (this.symmetry) {
+        //     case VERTICAL:
+        //         symmetricPoint = new Point(targetX, this.mapHeight - 1 - targetY);
+        //         break;
+        //     case HORIZONTAL:
+        //         symmetricPoint = new Point(this.mapWidth - 1 - targetX, targetY);
+        //         break;
+        //     case ROTATED:
+        //         symmetricPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
+        //         break;
+        // }
 
         navMap[targetY][targetX] = Direction.Center;
-        navMapDist[targetY][targetX] = 0;
+        // navMapDist[targetY][targetX] = 0;
 
-        symNavMap[symmetricPoint.y][symmetricPoint.x] = Direction.Center;
-        symNavMapDist[symmetricPoint.y][symmetricPoint.x] = 0;
+        vertSymNavMap[vertSymPoint.y][vertSymPoint.x] = Direction.Center;
+        horzSymNavMap[horzSymPoint.y][horzSymPoint.x] = Direction.Center;
+        rotSymNavMap[rotSymPoint.y][rotSymPoint.x] = Direction.Center;
+        // symNavMapDist[symmetricPoint.y][symmetricPoint.x] = 0;
 
         openSet.add(target);
         while (!openSet.isEmpty()) {
@@ -305,30 +325,50 @@ public class Navigator {
 
                     Direction navDir = bc.bcDirectionOpposite(d);
                     navMap[adjY][adjX] = navDir;
-                    navMapDist[adjY][adjX] = navMapDist[next.getY()][next.getX()] + 1;
+                    // navMapDist[adjY][adjX] = navMapDist[next.getY()][next.getX()] + 1;
 
-                    switch (this.symmetry) {
-                        case VERTICAL:
-                            symNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
-                            symNavMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX];
-                            break;
-                        case HORIZONTAL:
-                            symNavMap[adjY][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
-                            symNavMapDist[adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
-                            break;
-                        case ROTATED:
-                            symNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
-                            symNavMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
-                            break;
+                    if (this.isVerticallySymmetric) {
+                        vertSymNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
+                        // symNavMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX];
                     }
+                    if (this.isHorizontallySymmetric) {
+                        horzSymNavMap[adjY][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
+                        // symNavMapDist[adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
+                    }
+                    if (this.isRotatedSymmetric) {
+                        rotSymNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
+                        // symNavMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
+                    }
+                    // switch (this.symmetry) {
+                    //     case VERTICAL:
+                    //         symNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
+                    //         symNavMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX];
+                    //         break;
+                    //     case HORIZONTAL:
+                    //         symNavMap[adjY][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
+                    //         symNavMapDist[adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
+                    //         break;
+                    //     case ROTATED:
+                    //         symNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
+                    //         symNavMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
+                    //         break;
+                    // }
                 }
             }
         }
         this.navMaps.put(targetPoint, navMap);
-        this.navMapDists.put(targetPoint, navMapDist);
+        // this.navMapDists.put(targetPoint, navMapDist);
 
-        this.navMaps.put(symmetricPoint, symNavMap);
-        this.navMapDists.put(symmetricPoint, symNavMapDist);
+        if (this.isVerticallySymmetric) {
+            this.navMaps.put(vertSymPoint, vertSymNavMap);
+        }
+        if (this.isHorizontallySymmetric) {
+            this.navMaps.put(horzSymPoint, horzSymNavMap);
+        }
+        if (this.isRotatedSymmetric) {
+            this.navMaps.put(rotSymPoint, rotSymNavMap);
+        }
+        // this.navMapDists.put(symmetricPoint, symNavMapDist);
     }
 
     public Direction pathfind(Point start, Point target, boolean[][] map) {
