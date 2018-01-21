@@ -1,12 +1,17 @@
 import bc.*;
 
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class EarthPlayer extends PlanetPlayer {
     // "Radius" of square
@@ -20,15 +25,16 @@ public class EarthPlayer extends PlanetPlayer {
     // All worker pods
     private List<Set<Integer>> pods;
     private Map<Set<Integer>, Order> podOrders;
+    private Map<Set<Integer>, MapLocation> podTargets;
     private Navigator navigator;
 
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
 
         initializeNavigator();
-        // findKarboniteDeposits();
-        // makePods();
-        // assignInitialPods();
+        findKarboniteDeposits();
+        makePods();
+        assignInitialPods();
     }
 
     private void initializeNavigator() {
@@ -47,6 +53,7 @@ public class EarthPlayer extends PlanetPlayer {
         this.depositMap = new int[this.mapHeight][this.mapWidth];
         int maxDepositValue = 0; // TODO
 
+        Set<Integer> sortedUniqueDeposits = new TreeSet<>();
         for (int y = 0; y < this.mapHeight; y++) {
             for (int x = 0; x < this.mapWidth; x++) {
                 // Don't calculate deposits for impassable locations
@@ -56,8 +63,34 @@ public class EarthPlayer extends PlanetPlayer {
                 int value = getDepositValue(x, y, DEPOSIT_SCAN_RADIUS);
                 this.depositMap[y][x] = value;
                 maxDepositValue = Math.max(maxDepositValue, value);
+                sortedUniqueDeposits.add(value);
             }
         }
+        Integer[] sortedDeposits = sortedUniqueDeposits.toArray(new Integer[sortedUniqueDeposits.size()]);
+        // System.out.println(Arrays.toString(sortedDeposits));
+
+        // double mean = 0;
+        // int total = 0;
+        // for (int y = 0; y < this.mapHeight; y++) {
+        //     for (int x = 0; x < this.mapWidth; x++) {
+        //         if (this.depositMap[y][x] == 0) {
+        //             continue;
+        //         }
+        //         mean += this.depositMap[y][x];
+        //         total++;
+        //     }
+        // }
+        // mean /= total;
+        //
+        // double variance = 0;
+        // for (int y = 0; y < this.mapHeight; y++) {
+        //     for (int x = 0; x < this.mapWidth; x++) {
+        //         double diff = this.depositMap[y][x] - mean;
+        //         variance += diff * diff;
+        //     }
+        // }
+        // double stdev = Math.sqrt(variance / total);
+        // System.out.println(stdev);
     }
 
     private int getDepositValue(int x, int y, int radius) {
@@ -83,6 +116,7 @@ public class EarthPlayer extends PlanetPlayer {
 
     private void makePods() {
         this.podsMap = new HashMap<>();
+        this.podTargets = new HashMap<>();
         this.pods = new ArrayList<>();
 
         Set<Integer> processed = new HashSet<>();
@@ -149,53 +183,146 @@ public class EarthPlayer extends PlanetPlayer {
         }
     }
 
+    /**
+     * Returns the closest accessible karbonite deposit to a given location.
+     *
+     * @param start The location to find a karbonite deposit nearest to.
+     * @return The nearest karbonite deposit that can be moved to. If none
+     * exist, returns the given start location.
+     */
+    private MapLocation findNearestKarbonite(MapLocation start) {
+        Queue<MapLocation> openSet = new LinkedList<>();
+        Set<Point> closedSet = new HashSet<>();
+        openSet.add(start);
+
+        while (!openSet.isEmpty()) {
+            MapLocation next = openSet.remove();
+            if (this.map[next.getY()][next.getX()] > 0) {
+                return next;
+            }
+
+            closedSet.add(new Point(next.getX(), next.getY()));
+
+            for (Direction d : DIRECTIONS) {
+                MapLocation adj = next.add(d);
+                int adjX = adj.getX();
+                int adjY = adj.getY();
+                if (isOOB(adjX, adjY) || this.map[adjY][adjX] == IMPASSABLE) {
+                    continue;
+                }
+                Point adjPoint = new Point(adj.getX(), adj.getY());
+                if (!closedSet.contains(adjPoint)) {
+                    openSet.add(adj);
+                    closedSet.add(adjPoint);
+                }
+            }
+        }
+
+        return start;
+    }
+
     @Override
     public void processTurn() {
+        for (Set<Integer> pod : this.pods) {
+            Order order = this.podOrders.get(pod);
 
-
-        int i = 0;
-        // MapLocation[] targets = {new MapLocation(Planet.Earth, 18, 4), new MapLocation(Planet.Earth, 18, 15)};
-        MapLocation[] targets = {new MapLocation(Planet.Earth, 35, 35)};
-
-        // Set<Unit> pod = new HashSet<>();
-        // for (int worker : this.myUnits.get(UnitType.Worker)) {
-        //     pod.add(this.allUnits.get(worker));
-        // }
-        // this.navigator.doNavigate(pod, targets[0]);
-
-        for (int worker : this.myUnits.get(UnitType.Worker)) {
-            Unit workerUnit = this.allUnits.get(worker);
-            MapLocation loc = workerUnit.location().mapLocation();
-
-            MapLocation target = targets[i % targets.length];
-
-            Direction toMove = this.navigator.navigate(worker, loc, target);
-            if (this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
-                this.gc.moveRobot(worker, toMove);
+            // Remove units that don't exist anymore
+            for (Iterator<Integer> it = pod.iterator(); it.hasNext(); ) {
+                int unit = it.next();
+                if (!unitExists(unit)) {
+                    it.remove();
+                }
             }
-            i++;
 
+            // TODO Handle removing from this.pods, this.podOrders, podsMap, etc.
+            if (pod.isEmpty()) {
+                continue;
+            }
 
-            // VecUnit allUnits = this.gc.units();
-            // for (int i = 0; i < allUnits.size(); i++) {
-            //     Location l = allUnits.get(i).location();
-            //     if (l.isOnMap() && !l.isInGarrison()) {
-            //         MapLocation ml = l.mapLocation();
-            //         navMap[ml.getY()][ml.getX()] = false;
-            //     }
-            // }
-            // // for (boolean[] b : navMap) {
-            // //     for (boolean bb : b) {
-            // //         System.out.print(bb ? "." : "#");
-            // //     }
-            // // }
-            // // System.out.println();
-            //
-            // Direction toMove = nav.pathfind(new Point(loc.getX(), loc.getY()), new Point(18, 10), navMap);
-            // if (toMove != null && this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
-            //     this.gc.moveRobot(worker, toMove);
-            // }
+            // TODO For mining: Occasionally update the entire karbonite map
+            // TODO so deposits mined by the enemy are updated and known
+            switch (order) {
+                case BUILD:
+                    break;
+                case MINE:
+                    MapLocation targetDeposit = this.podTargets.get(pod);
+                    // If this pod doesn't have a mining target, or if that
+                    // target has run out of karbonite, find a new target
+                    if (targetDeposit == null || this.map[targetDeposit.getY()][targetDeposit.getX()] <= 0) {
+                        int sampleUnit = pod.iterator().next();
+                        for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.allUnits.get(sampleUnit).location().isInGarrison(); ) {
+                            sampleUnit = it.next();
+                        }
+                        // If all units are garrisoned, don't to anything
+                        if (this.allUnits.get(sampleUnit).location().isInGarrison()) {
+                            break;
+                        }
+                        MapLocation nextDeposit = findNearestKarbonite(this.allUnits.get(sampleUnit).location().mapLocation());
+                        this.podTargets.put(pod, nextDeposit);
+                    }
+                    targetDeposit = this.podTargets.get(pod);
+                    this.map[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+                    for (int unit : pod) {
+                        MapLocation unitLoc = this.allUnits.get(unit).location().mapLocation();
+                        Direction dirToTarget = unitLoc.directionTo(targetDeposit);
+                        // Try to mine the target
+                        if (this.gc.canHarvest(unit, dirToTarget)) {
+                            this.gc.harvest(unit, dirToTarget);
+                            this.map[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+                        } else {
+                            // If it can't be mined, move in range so that it can be
+                            Direction toMove = this.navigator.navigate(unit, unitLoc, targetDeposit);
+                            this.navigator.tryMove(unit, toMove);
+                        }
+                    }
+                    break;
+            }
         }
+
+
+        // int i = 0;
+        // // MapLocation[] targets = {new MapLocation(Planet.Earth, 18, 4), new MapLocation(Planet.Earth, 18, 15)};
+        // MapLocation[] targets = {new MapLocation(Planet.Earth, 10, 10)};
+        //
+        // // Set<Unit> pod = new HashSet<>();
+        // // for (int worker : this.myUnits.get(UnitType.Worker)) {
+        // //     pod.add(this.allUnits.get(worker));
+        // // }
+        // // this.navigator.doNavigate(pod, targets[0]);
+        //
+        // for (int worker : this.myUnits.get(UnitType.Worker)) {
+        //     Unit workerUnit = this.allUnits.get(worker);
+        //     MapLocation loc = workerUnit.location().mapLocation();
+        //
+        //     MapLocation target = targets[i % targets.length];
+        //
+        //     Direction toMove = this.navigator.navigate(worker, loc, target);
+        //     if (this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
+        //         this.gc.moveRobot(worker, toMove);
+        //     }
+        //     i++;
+        //
+        //
+        //     // VecUnit allUnits = this.gc.units();
+        //     // for (int i = 0; i < allUnits.size(); i++) {
+        //     //     Location l = allUnits.get(i).location();
+        //     //     if (l.isOnMap() && !l.isInGarrison()) {
+        //     //         MapLocation ml = l.mapLocation();
+        //     //         navMap[ml.getY()][ml.getX()] = false;
+        //     //     }
+        //     // }
+        //     // // for (boolean[] b : navMap) {
+        //     // //     for (boolean bb : b) {
+        //     // //         System.out.print(bb ? "." : "#");
+        //     // //     }
+        //     // // }
+        //     // // System.out.println();
+        //     //
+        //     // Direction toMove = nav.pathfind(new Point(loc.getX(), loc.getY()), new Point(18, 10), navMap);
+        //     // if (toMove != null && this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
+        //     //     this.gc.moveRobot(worker, toMove);
+        //     // }
+        // }
 
         // VecUnit is a class that you can think of as similar to ArrayList<Unit>, but immutable.
         // VecUnit units = this.gc.myUnits();

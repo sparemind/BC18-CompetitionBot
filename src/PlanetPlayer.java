@@ -134,6 +134,8 @@ public abstract class PlanetPlayer {
         for (UnitType type : this.myUnits.keySet()) {
             this.myUnits.get(type).clear();
         }
+        this.allUnits.clear();
+
         VecUnit units = this.gc.units();
         for (int i = 0; i < units.size(); i++) {
             Unit unit = units.get(i);
@@ -142,6 +144,16 @@ public abstract class PlanetPlayer {
             }
             this.allUnits.put(unit.id(), unit);
         }
+    }
+
+    /**
+     * Returns whether a unit of the given ID exists.
+     *
+     * @param unitID The ID of the unit to check.
+     * @return True if a unit of the given ID exists, false otherwise.
+     */
+    public boolean unitExists(int unitID) {
+        return this.allUnits.containsKey(unitID);
     }
 
     /**
