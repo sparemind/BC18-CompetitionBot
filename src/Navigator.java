@@ -37,7 +37,7 @@ public class Navigator {
         DIR_VERT_MIRROR.put(Direction.South, Direction.North);
         DIR_VERT_MIRROR.put(Direction.Southwest, Direction.Northwest);
         DIR_VERT_MIRROR.put(Direction.West, Direction.West);
-        DIR_VERT_MIRROR.put(Direction.Northwest, Direction.Northeast);
+        DIR_VERT_MIRROR.put(Direction.Northwest, Direction.Southwest);
 
         DIR_VAL.put(Direction.North, 0);
         DIR_VAL.put(Direction.Northeast, 1);
@@ -203,6 +203,14 @@ public class Navigator {
         if (!this.navMaps.containsKey(targetPoint)) {
             createNavMap(target);
         }
+    }
+
+    public boolean tryMove(int unit, Direction direction) {
+        if (this.gc.isMoveReady(unit) && this.gc.canMove(unit, direction)) {
+            this.gc.moveRobot(unit, direction);
+            return true;
+        }
+        return false;
     }
 
     public Direction navigate(int unit, MapLocation start, MapLocation target) {
