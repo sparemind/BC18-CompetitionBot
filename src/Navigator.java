@@ -10,13 +10,8 @@ import java.util.Queue;
 import java.util.Set;
 
 public class Navigator {
-    public enum Symmetry {
-        VERTICAL, HORIZONTAL, ROTATED
-    }
-
     static final Direction[] DIRECTIONS = {Direction.North, Direction.Northeast, Direction.East, Direction.Southeast, Direction.South, Direction.Southwest, Direction.West, Direction.Northwest};
     static final Map<Direction, Integer> DIR_VAL = new HashMap<>();
-
     private static final double SQRT2 = Math.sqrt(2.0);
     private static final double A_STAR_WEIGHT = 1.0;
     private static final Direction[] D_DIRS = {Direction.Northeast, Direction.Southeast, Direction.Southwest, Direction.Northwest, Direction.North, Direction.East, Direction.South, Direction.West};
@@ -70,6 +65,36 @@ public class Navigator {
         this.mapWidth = this.passable[0].length;
 
         findSymmetry();
+    }
+
+    private void findSymmetry() {
+        boolean verticalSymmetry = true;
+        boolean horizontalSymmetry = true;
+        boolean rotatedSymmetry = true;
+        for (int y = 0; y < this.mapHeight; y++) {
+            for (int x = 0; x < this.mapWidth; x++) {
+                int mirrorX = this.mapWidth - 1 - x;
+                int mirrorY = this.mapHeight - 1 - y;
+                if (verticalSymmetry && this.passable[y][x] != this.passable[mirrorY][x]) {
+                    verticalSymmetry = false;
+                }
+                if (horizontalSymmetry && this.passable[y][x] != this.passable[y][mirrorX]) {
+                    horizontalSymmetry = false;
+                }
+                if (rotatedSymmetry && this.passable[y][x] != this.passable[mirrorY][mirrorX]) {
+                    rotatedSymmetry = false;
+                }
+            }
+        }
+
+        if (verticalSymmetry) {
+            this.symmetry = Navigator.Symmetry.VERTICAL;
+        } else if (horizontalSymmetry) {
+            this.symmetry = Navigator.Symmetry.HORIZONTAL;
+        } else {
+            this.symmetry = Navigator.Symmetry.ROTATED;
+        }
+        System.out.println("Symmetry: " + verticalSymmetry + ":" + horizontalSymmetry + ":" + rotatedSymmetry);
     }
 
     // public void precomputeNavMaps(Planet planet) {
@@ -135,45 +160,53 @@ public class Navigator {
     //     }
     // }
 
-    private void findSymmetry() {
-        boolean verticalSymmetry = true;
-        boolean horizontalSymmetry = true;
-        boolean rotatedSymmetry = true;
-        for (int y = 0; y < this.mapHeight; y++) {
-            for (int x = 0; x < this.mapWidth; x++) {
-                int mirrorX = this.mapWidth - 1 - x;
-                int mirrorY = this.mapHeight - 1 - y;
-                if (verticalSymmetry && this.passable[y][x] != this.passable[mirrorY][x]) {
-                    verticalSymmetry = false;
-                }
-                if (horizontalSymmetry && this.passable[y][x] != this.passable[y][mirrorX]) {
-                    horizontalSymmetry = false;
-                }
-                if (rotatedSymmetry && this.passable[y][x] != this.passable[mirrorY][mirrorX]) {
-                    rotatedSymmetry = false;
-                }
-            }
-        }
-
-        if (verticalSymmetry) {
-            this.symmetry = Navigator.Symmetry.VERTICAL;
-        } else if (horizontalSymmetry) {
-            this.symmetry = Navigator.Symmetry.HORIZONTAL;
-        } else {
-            this.symmetry = Navigator.Symmetry.ROTATED;
-        }
-        System.out.println("Symmetry: " + verticalSymmetry + ":" + horizontalSymmetry + ":" + rotatedSymmetry);
-    }
-
     private boolean isOOB(int x, int y) {
         return x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight;
     }
 
-    public Direction navigate(int unit, MapLocation start, MapLocation target) {
+    public void doNavigate(Set<Unit> units, MapLocation target) {
+        Map<Integer, Direction> directions = navigate(units, target);
+        for (int unit : directions.keySet()) {
+            if (this.gc.isMoveReady(unit) && this.gc.canMove(unit, directions.get(unit))) {
+                this.gc.moveRobot(unit, directions.get(unit));
+            }
+        }
+    }
+
+    public Map<Integer, Direction> navigate(Set<Unit> units, MapLocation target) {
         Point targetPoint = new Point(target.getX(), target.getY());
+        ensureNavMap(target, targetPoint);
+        Map<Integer, Direction> directions = new HashMap<>();
+
+        Queue<Unit> orderedUnits = new PriorityQueue<>((u1, u2) -> {
+            MapLocation u1Loc = u1.location().mapLocation();
+            MapLocation u2Loc = u2.location().mapLocation();
+
+            int u1Dist = this.navMapDists.get(targetPoint)[u1Loc.getY()][u1Loc.getX()];
+            int u2Dist = this.navMapDists.get(targetPoint)[u2Loc.getY()][u2Loc.getX()];
+
+            return Integer.compare(u2Dist, u1Dist);
+        });
+        for (Unit unit : units) {
+            orderedUnits.add(unit);
+        }
+
+        for (Unit unit : orderedUnits) {
+            directions.put(unit.id(), navigate(unit.id(), unit.location().mapLocation(), target));
+        }
+
+        return directions;
+    }
+
+    private void ensureNavMap(MapLocation target, Point targetPoint) {
         if (!this.navMaps.containsKey(targetPoint)) {
             createNavMap(target);
         }
+    }
+
+    public Direction navigate(int unit, MapLocation start, MapLocation target) {
+        Point targetPoint = new Point(target.getX(), target.getY());
+        ensureNavMap(target, targetPoint);
         Direction nextDir = this.navMaps.get(targetPoint)[start.getY()][start.getX()];
         if (nextDir == null || nextDir == Direction.Center) {
             return Direction.Center;
@@ -203,6 +236,7 @@ public class Navigator {
                 bestAdjustedDirDist = distanceToTarget;
             }
         }
+
         return bestAdjustedDir;
     }
 
@@ -398,6 +432,10 @@ public class Navigator {
         int dx = Math.abs(p1.x - p2.x);
         int dy = Math.abs(p1.y - p2.y);
         return A_STAR_WEIGHT * ((dx + dy) + (SQRT2 - 2) * Math.min(dx, dy));
+    }
+
+    public enum Symmetry {
+        VERTICAL, HORIZONTAL, ROTATED
     }
 
     private static class Node implements Comparable<Node> {
