@@ -14,11 +14,15 @@ public class Navigator {
         VERTICAL, HORIZONTAL, ROTATED
     }
 
+    static final Direction[] DIRECTIONS = {Direction.North, Direction.Northeast, Direction.East, Direction.Southeast, Direction.South, Direction.Southwest, Direction.West, Direction.Northwest};
+    static final Map<Direction, Integer> DIR_VAL = new HashMap<>();
+
     private static final double SQRT2 = Math.sqrt(2.0);
     private static final double A_STAR_WEIGHT = 1.0;
     private static final Direction[] D_DIRS = {Direction.Northeast, Direction.Southeast, Direction.Southwest, Direction.Northwest, Direction.North, Direction.East, Direction.South, Direction.West};
     private static final Map<Direction, Direction> DIR_HORZ_MIRROR = new HashMap<>();
     private static final Map<Direction, Direction> DIR_VERT_MIRROR = new HashMap<>();
+    private static final int[] DIR_ROT_ORDER = {-1, 1, -2, 2};
 
     static {
         DIR_HORZ_MIRROR.put(Direction.North, Direction.North);
@@ -38,6 +42,15 @@ public class Navigator {
         DIR_VERT_MIRROR.put(Direction.Southwest, Direction.Northwest);
         DIR_VERT_MIRROR.put(Direction.West, Direction.West);
         DIR_VERT_MIRROR.put(Direction.Northwest, Direction.Northeast);
+
+        DIR_VAL.put(Direction.North, 0);
+        DIR_VAL.put(Direction.Northeast, 1);
+        DIR_VAL.put(Direction.East, 2);
+        DIR_VAL.put(Direction.Southeast, 3);
+        DIR_VAL.put(Direction.South, 4);
+        DIR_VAL.put(Direction.Southwest, 5);
+        DIR_VAL.put(Direction.West, 6);
+        DIR_VAL.put(Direction.Northwest, 7);
     }
 
     private GameController gc;
@@ -156,17 +169,41 @@ public class Navigator {
         return x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight;
     }
 
-    public Direction navigate(int unitID, MapLocation start, MapLocation target) {
+    public Direction navigate(int unit, MapLocation start, MapLocation target) {
         Point targetPoint = new Point(target.getX(), target.getY());
         if (!this.navMaps.containsKey(targetPoint)) {
             createNavMap(target);
         }
         Direction nextDir = this.navMaps.get(targetPoint)[start.getY()][start.getX()];
-        if (nextDir == null) {
+        if (nextDir == null || nextDir == Direction.Center) {
             return Direction.Center;
         }
 
-        return nextDir;
+        // Move in this direction if possible
+        if (this.gc.canMove(unit, nextDir)) {
+            return nextDir;
+        }
+
+        // If not possible, try turning slightly left or right and see if a spot
+        // is open that is closer to the target.
+        Direction bestAdjustedDir = Direction.Center;
+        // long bestAdjustedDirDist = Integer.MAX_VALUE; // Use this for back and forth motion instead
+        long bestAdjustedDirDist = start.distanceSquaredTo(target);
+        for (int i = 0; i < DIR_ROT_ORDER.length; i++) {
+            int index = (DIR_VAL.get(nextDir) + DIR_ROT_ORDER[i] + DIRECTIONS.length) % DIRECTIONS.length;
+            Direction adjustedDir = DIRECTIONS[index];
+            if (!this.gc.canMove(unit, adjustedDir)) {
+                continue;
+            }
+
+            MapLocation newPos = start.add(adjustedDir);
+            long distanceToTarget = newPos.distanceSquaredTo(target);
+            if (distanceToTarget < bestAdjustedDirDist) {
+                bestAdjustedDir = adjustedDir;
+                bestAdjustedDirDist = distanceToTarget;
+            }
+        }
+        return bestAdjustedDir;
     }
 
     /**
@@ -271,9 +308,9 @@ public class Navigator {
 
             closedSet.add(current);
 
-            Node[] neighbors = new Node[PlanetPlayer.DIRECTIONS.length];
-            for (int i = 0; i < PlanetPlayer.DIRECTIONS.length; i++) {
-                Direction dir = PlanetPlayer.DIRECTIONS[i];
+            Node[] neighbors = new Node[DIRECTIONS.length];
+            for (int i = 0; i < DIRECTIONS.length; i++) {
+                Direction dir = DIRECTIONS[i];
                 Point dirVector = PlanetPlayer.DIR_VECTORS.get(dir);
                 Node adjNode = new Node(new Point(current.point.x + dirVector.x, current.point.y + dirVector.y));
                 adjNode.fromParent = dir;
