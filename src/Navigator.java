@@ -169,28 +169,41 @@ public class Navigator {
         return nextDir;
     }
 
+    /**
+     * Creates a navigation map for a target map location and the location's
+     * symmetrical pair.
+     *
+     * @param target The location to create a navigation map for.
+     */
     private void createNavMap(MapLocation target) {
-        int x = target.getX();
-        int y = target.getY();
-        Point targetPoint = new Point(x, y);
+        int targetX = target.getX();
+        int targetY = target.getY();
+        Point targetPoint = new Point(targetX, targetY);
 
         Queue<MapLocation> openSet = new LinkedList<>();
         Direction[][] navMap = new Direction[this.mapHeight][this.mapWidth];
         Direction[][] symNavMap = new Direction[this.mapHeight][this.mapWidth];
         int[][] navMapDist = new int[this.mapHeight][this.mapWidth];
+        int[][] symNavMapDist = new int[this.mapHeight][this.mapWidth];
 
-        navMap[y][x] = Direction.Center;
+        Point symmetricPoint = null;
         switch (this.symmetry) {
             case VERTICAL:
-                symNavMap[this.mapHeight - 1 - y][x] = Direction.Center;
+                symmetricPoint = new Point(targetX, this.mapHeight - 1 - targetY);
                 break;
             case HORIZONTAL:
-                symNavMap[y][this.mapWidth - 1 - x] = Direction.Center;
+                symmetricPoint = new Point(this.mapWidth - 1 - targetX, targetY);
                 break;
             case ROTATED:
-                symNavMap[this.mapHeight - 1 - y][this.mapWidth - 1 - x] = Direction.Center;
+                symmetricPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
                 break;
         }
+
+        navMap[targetY][targetX] = Direction.Center;
+        navMapDist[targetY][targetX] = 0;
+
+        symNavMap[symmetricPoint.y][symmetricPoint.x] = Direction.Center;
+        symNavMapDist[symmetricPoint.y][symmetricPoint.x] = 0;
 
         openSet.add(target);
         while (!openSet.isEmpty()) {
@@ -212,15 +225,15 @@ public class Navigator {
                     switch (this.symmetry) {
                         case VERTICAL:
                             symNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
-                            navMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX] + 1;
+                            symNavMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX];
                             break;
                         case HORIZONTAL:
-                            symNavMap[y][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
-                            navMapDist[y][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX] + 1;
+                            symNavMap[adjY][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
+                            symNavMapDist[adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
                             break;
                         case ROTATED:
                             symNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
-                            navMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX] + 1;
+                            symNavMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
                             break;
                     }
                 }
@@ -229,17 +242,8 @@ public class Navigator {
         this.navMaps.put(targetPoint, navMap);
         this.navMapDists.put(targetPoint, navMapDist);
 
-        switch (this.symmetry) {
-            case VERTICAL:
-                this.navMaps.put(new Point(x, this.mapHeight - 1 - y), symNavMap);
-                break;
-            case HORIZONTAL:
-                this.navMaps.put(new Point(this.mapWidth - 1 - x, y), symNavMap);
-                break;
-            case ROTATED:
-                this.navMaps.put(new Point(this.mapWidth - 1 - x, this.mapHeight - 1 - y), symNavMap);
-                break;
-        }
+        this.navMaps.put(symmetricPoint, symNavMap);
+        this.navMapDists.put(symmetricPoint, symNavMapDist);
     }
 
     public Direction pathfind(Point start, Point target, boolean[][] map) {
