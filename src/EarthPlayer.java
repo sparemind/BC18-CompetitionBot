@@ -27,6 +27,8 @@ public class EarthPlayer extends PlanetPlayer {
     private Map<Set<Integer>, Order> podOrders;
     private Map<Set<Integer>, MapLocation> podMiningTargets;
     private Map<Set<Integer>, Integer> podBuildingTargets;
+    private Map<Set<Integer>, Integer> podBuildingIdle;
+    private List<MapLocation> attackPoints;
 
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
@@ -35,6 +37,15 @@ public class EarthPlayer extends PlanetPlayer {
         findKarboniteDeposits();
         makePods();
         assignInitialPods();
+
+        this.attackPoints = new ArrayList<>();
+        VecUnit initial = gc.startingMap(planet).getInitial_units();
+        for (int i = 0; i < initial.size(); i++) {
+            if (initial.get(i).team() == this.MY_TEAM) {
+                continue;
+            }
+            this.attackPoints.add(initial.get(i).location().mapLocation());
+        }
     }
 
     // private void initializeNavigator() {
@@ -118,6 +129,7 @@ public class EarthPlayer extends PlanetPlayer {
         this.podsMap = new HashMap<>();
         this.podMiningTargets = new IdentityHashMap<>();
         this.podBuildingTargets = new IdentityHashMap<>();
+        this.podBuildingIdle = new IdentityHashMap<>();
         this.pods = new ArrayList<>();
 
         Set<Integer> processed = new HashSet<>();
@@ -226,9 +238,13 @@ public class EarthPlayer extends PlanetPlayer {
     public void processTurn() {
 
         boolean allFactoriesProducing = true;
+        boolean allFactoriesBuilt = true;
         for (int factory : this.myUnits.get(UnitType.Factory)) {
-            Unit factoryUnit = this.allUnits.get(factory);
-            if (factoryUnit.isFactoryProducing() == 0) {
+            Unit factoryUnit = this.gc.unit(factory);
+            if (factoryUnit.structureIsBuilt() == 0) {
+                allFactoriesBuilt = false;
+            }
+            if (factoryUnit.structureIsBuilt() == 1 && factoryUnit.isFactoryProducing() == 0) {
                 allFactoriesProducing = false;
                 break;
             }
@@ -252,37 +268,49 @@ public class EarthPlayer extends PlanetPlayer {
 
             for (int y = 0; y < this.mapHeight; y++) {
                 for (int x = 0; x < this.mapWidth; x++) {
-                    if (this.gc.canSenseLocation(new MapLocation(this.planet, x, y)))
+                    if (this.gc.canSenseLocation(new MapLocation(this.planet, x, y))) {
                         this.karboniteMap[y][x] = (int) Math.min(this.gc.karboniteAt(new MapLocation(this.planet, x, y)), this.karboniteMap[y][x]);
+                    }
                 }
             }
 
             switch (order) {
                 case BUILD:
+                    if (!this.podBuildingIdle.containsKey(pod)) {
+                        this.podBuildingIdle.put(pod, 0);
+                    }
+                    if (this.podBuildingIdle.get(pod) > 3) { // TODO
+                        this.podOrders.put(pod, Order.MINE);
+                        break;
+                    }
+                    this.podBuildingIdle.put(pod, this.podBuildingIdle.get(pod) + 1);
+
                     Integer targetBuilding = this.podBuildingTargets.get(pod);
                     // If this pod doesn't have a building target, or if that
                     // target is built, find a new target
-                    if (targetBuilding == null || this.allUnits.get(targetBuilding).structureIsBuilt() == 1) {
+                    if (targetBuilding == null || this.gc.unit(targetBuilding).structureIsBuilt() == 1) {
                         // Don't create more factories if the current ones are enough
                         if (!allFactoriesProducing) {
                             break;
                         }
 
                         int sampleUnit = pod.iterator().next();
-                        for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.allUnits.get(sampleUnit).location().isInGarrison(); ) {
+                        for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.gc.unit(sampleUnit).location().isInGarrison(); ) {
                             sampleUnit = it.next();
                         }
                         // If all units are garrisoned, don't do anything
-                        if (this.allUnits.get(sampleUnit).location().isInGarrison()) {
+                        if (this.gc.unit(sampleUnit).location().isInGarrison()) {
                             break;
                         }
-                        Unit blueprintingUnit = this.allUnits.get(sampleUnit);
+                        Unit blueprintingUnit = this.gc.unit(sampleUnit);
                         MapLocation unitLoc = blueprintingUnit.location().mapLocation();
                         for (Direction d : DIRECTIONS) {
                             if (this.gc.canBlueprint(sampleUnit, UnitType.Factory, d)) {
                                 this.gc.blueprint(sampleUnit, UnitType.Factory, d);
                                 Unit blueprint = this.gc.senseUnitAtLocation(unitLoc.add(d));
                                 this.podBuildingTargets.put(pod, blueprint.id());
+
+                                this.podBuildingIdle.put(pod, 0);
                                 break;
                             }
                         }
@@ -290,53 +318,128 @@ public class EarthPlayer extends PlanetPlayer {
                     targetBuilding = this.podBuildingTargets.get(pod);
 
                     for (int unit : pod) {
-                        MapLocation unitLoc = this.allUnits.get(unit).location().mapLocation();
+                        MapLocation unitLoc = this.gc.unit(unit).location().mapLocation();
 
                         if (this.gc.canBuild(unit, targetBuilding)) {
                             this.gc.build(unit, targetBuilding);
+                            this.podBuildingIdle.put(pod, 0);
                         } else {
                             Direction toMove = this.navigator.navigate(unit, unitLoc, this.gc.unit(targetBuilding).location().mapLocation());
                             this.navigator.tryMove(unit, toMove);
+                            this.podBuildingIdle.put(pod, 0);
                         }
                     }
                     break;
                 case MINE:
+                    // TODO
+                    // TODO Replicate when a surplus of karbonite is in the area
+                    // TODO Base it off some ratio of karbonite vs. # workers in pod
+
                     MapLocation targetDeposit = this.podMiningTargets.get(pod);
                     // If this pod doesn't have a mining target, or if that
                     // target has run out of karbonite, find a new target
                     if (targetDeposit == null || this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] <= 0) {
                         int sampleUnit = pod.iterator().next();
-                        for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.allUnits.get(sampleUnit).location().isInGarrison(); ) {
+                        for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.gc.unit(sampleUnit).location().isInGarrison(); ) {
                             sampleUnit = it.next();
                         }
                         // If all units are garrisoned, don't do anything
-                        if (this.allUnits.get(sampleUnit).location().isInGarrison()) {
+                        if (this.gc.unit(sampleUnit).location().isInGarrison()) {
                             break;
                         }
-                        MapLocation nextDeposit = findNearestKarbonite(this.allUnits.get(sampleUnit).location().mapLocation());
+                        MapLocation nextDeposit = findNearestKarbonite(this.gc.unit(sampleUnit).location().mapLocation());
                         this.podMiningTargets.put(pod, nextDeposit);
                     }
                     targetDeposit = this.podMiningTargets.get(pod);
-                    this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+                    // this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+
+                    Set<Integer> podToAddTo = null;
+                    Unit replicatedUnit = null;
                     for (int unit : pod) {
-                        MapLocation unitLoc = this.allUnits.get(unit).location().mapLocation();
+                        MapLocation unitLoc = this.gc.unit(unit).location().mapLocation();
                         Direction dirToTarget = unitLoc.directionTo(targetDeposit);
+
+                        if (!this.myUnits.get(UnitType.Factory).isEmpty() && allFactoriesProducing) {
+                            int value = getDepositValue(unitLoc.getX(), unitLoc.getY(), 3); // TODO
+                            if (value / pod.size() <= 100) {
+                                continue;
+                            }
+                            Direction dirToReplicate = dirToTarget;
+                            if (!this.gc.canReplicate(unit, dirToReplicate)) {
+                                for (Direction d : DIRECTIONS) {
+                                    if (this.gc.canReplicate(unit, d)) {
+                                        dirToReplicate = d;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (this.gc.canReplicate(unit, dirToReplicate)) {
+                                this.gc.replicate(unit, dirToReplicate);
+                                replicatedUnit = this.gc.senseUnitAtLocation(unitLoc.add(dirToReplicate));
+                                podToAddTo = pod;
+                                // if (pod.size() > 3) {
+                                //     podToAddTo = new HashSet<>();
+                                //     this.pods.add(podToAddTo);
+                                //     this.podOrders.put(podToAddTo, Order.MINE);
+                                // }
+                            }
+                        }
+
+                        // Direction toMove = this.navigator.navigate(unit, unitLoc, targetDeposit);
+                        // if (toMove == Direction.Center) {
+                        //     if (this.gc.canHarvest(unit, dirToTarget)) {
+                        //         this.gc.harvest(unit, dirToTarget);
+                        //     }
+                        // } else {
+                        //     this.navigator.tryMove(unit, toMove);
+                        //     // boolean successfulMove = this.navigator.tryMove(unit, toMove);
+                        //     // if (!successfulMove) {
+                        //     for (Direction d : DIRECTIONS) {
+                        //         if (this.gc.canHarvest(unit, d)) {
+                        //             this.gc.harvest(unit, d);
+                        //             break;
+                        //         }
+                        //     }
+                        //     // }
+                        // }
+
+                        // if (dirToTarget != Direction.Center && this.gc.canMove(unit, dirToTarget) && this.gc.canHarvest(unit, dirToTarget)) {
+                        //     this.gc.moveRobot(unit, dirToTarget);
+                        //     this.gc.harvest(unit, Direction.Center);
+                        //     continue;
+                        // }
+
                         // Try to mine the target
                         if (this.gc.canHarvest(unit, dirToTarget)) {
                             this.gc.harvest(unit, dirToTarget);
-                            this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+                            // this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
                         } else {
                             // If it can't be mined, move in range so that it can be
                             Direction toMove = this.navigator.navigate(unit, unitLoc, targetDeposit);
-                            this.navigator.tryMove(unit, toMove);
+                            boolean successfulMove = this.navigator.tryMove(unit, toMove);
+                            // If can't mine target and can't move, try to mine
+                            // something else nearby
+                            if (!successfulMove) {
+                                for (Direction d : DIRECTIONS) {
+                                    if (this.gc.canHarvest(unit, d)) {
+                                        this.gc.harvest(unit, d);
+                                        break;
+                                    }
+                                }
+                            }
                         }
+                    }
+
+                    if (podToAddTo != null) {
+                        podToAddTo.add(replicatedUnit.id());
+                        this.podsMap.put(replicatedUnit.id(), podToAddTo);
                     }
                     break;
             }
         }
 
         for (int factory : this.myUnits.get(UnitType.Factory)) {
-            Unit factoryUnit = this.allUnits.get(factory);
+            Unit factoryUnit = this.gc.unit(factory);
             if (factoryUnit.structureIsBuilt() == 0) {
                 continue;
             }
@@ -357,6 +460,17 @@ public class EarthPlayer extends PlanetPlayer {
 
         for (int ranger : this.myUnits.get(UnitType.Ranger)) {
             move(ranger, new MapLocation(this.planet, 10, 10));
+
+            if (!this.gc.unit(ranger).location().isOnMap()) {
+                continue;
+            }
+
+            VecUnit nearby = this.gc.senseNearbyUnitsByTeam(this.gc.unit(ranger).location().mapLocation(), this.gc.unit(ranger).attackRange(), this.ENEMY_TEAM);
+            for (int i = 0; i < nearby.size(); i++) {
+                if (this.gc.isAttackReady(ranger) && this.gc.canAttack(ranger, nearby.get(i).id())) {
+                    this.gc.attack(ranger, nearby.get(i).id());
+                }
+            }
         }
 
 
@@ -366,12 +480,12 @@ public class EarthPlayer extends PlanetPlayer {
         //
         // // Set<Unit> pod = new HashSet<>();
         // // for (int worker : this.myUnits.get(UnitType.Worker)) {
-        // //     pod.add(this.allUnits.get(worker));
+        // //     pod.add(this.gc.unit(worker));
         // // }
         // // this.navigator.doNavigate(pod, targets[0]);
         //
         // for (int worker : this.myUnits.get(UnitType.Worker)) {
-        //     Unit workerUnit = this.allUnits.get(worker);
+        //     Unit workerUnit = this.gc.unit(worker);
         //     MapLocation loc = workerUnit.location().mapLocation();
         //
         //     MapLocation target = targets[i % targets.length];
@@ -424,7 +538,7 @@ public class EarthPlayer extends PlanetPlayer {
         /*
         for (int worker : this.myUnits.get(UnitType.Worker)) {
             // if (this.gc.karbonite() > bc.bcUnitTypeBlueprintCost(UnitType.Factory)) {
-            Unit workerUnit = this.allUnits.get(worker);
+            Unit workerUnit = this.gc.unit(worker);
             if (workerUnit.location().isInGarrison()) {
                 continue;
             }
@@ -451,7 +565,7 @@ public class EarthPlayer extends PlanetPlayer {
         }
 
         for (int ranger : this.myUnits.get(UnitType.Ranger)) {
-            Unit rangerUnit = this.allUnits.get(ranger);
+            Unit rangerUnit = this.gc.unit(ranger);
             if (rangerUnit.location().isInGarrison()) {
                 continue;
             }
@@ -489,7 +603,7 @@ public class EarthPlayer extends PlanetPlayer {
         }
 
         for (int factory : this.myUnits.get(UnitType.Factory)) {
-            Unit factoryUnit = this.allUnits.get(factory);
+            Unit factoryUnit = this.gc.unit(factory);
             MapLocation loc = factoryUnit.location().mapLocation();
 
             boolean freeSurroundings = false;

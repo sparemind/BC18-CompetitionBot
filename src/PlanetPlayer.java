@@ -45,6 +45,8 @@ public abstract class PlanetPlayer {
     protected Map<Integer, Unit> allUnits;
     // Key: UnitType, Value: Set of all my units of that type
     protected Map<UnitType, Set<Integer>> myUnits;
+    // Key: UnitType, Value: Set of all my units of that type
+    protected Map<UnitType, Set<Integer>> oppUnits;
 
     /**
      * Creates a new player.
@@ -138,8 +140,10 @@ public abstract class PlanetPlayer {
 
         // Set up units map
         this.myUnits = new HashMap<>();
+        this.oppUnits = new HashMap<>();
         for (UnitType type : UnitType.values()) {
             this.myUnits.put(type, new HashSet<>());
+            this.oppUnits.put(type, new HashSet<>());
         }
 
         this.navigator = new Navigator(gc, this.passableMap);
@@ -154,6 +158,7 @@ public abstract class PlanetPlayer {
         // Update unit maps
         for (UnitType type : this.myUnits.keySet()) {
             this.myUnits.get(type).clear();
+            this.oppUnits.get(type).clear();
         }
         this.allUnits.clear();
 
@@ -162,6 +167,8 @@ public abstract class PlanetPlayer {
             Unit unit = units.get(i);
             if (unit.team() == this.MY_TEAM) {
                 this.myUnits.get(unit.unitType()).add(unit.id());
+            } else {
+                this.oppUnits.get(unit.unitType()).add(unit.id());
             }
             this.allUnits.put(unit.id(), unit);
         }
