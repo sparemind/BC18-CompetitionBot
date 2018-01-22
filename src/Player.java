@@ -26,14 +26,7 @@ public class Player {
 
     public static void main(String[] args) {
         Player player = new Player();
-
-        // Catch all exceptions, since crashing will disable all play for the
-        // rest of the game.
-        try {
-            player.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        player.start();
     }
 
     /**
@@ -51,10 +44,17 @@ public class Player {
 
         // Keep playing turns as long as possible
         while (true) {
-            this.player.processPreTurn();
-            this.player.processTurn();
-            this.player.processPostTurn();
+            // Catch all exceptions, since crashing will disable all play for the
+            // rest of the game.
+            try {
+                this.player.processPreTurn();
+                this.player.processTurn();
+                this.player.processPostTurn();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             this.gc.nextTurn();
+
         }
     }
 }
