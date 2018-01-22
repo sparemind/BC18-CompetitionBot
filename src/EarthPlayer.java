@@ -173,9 +173,9 @@ public class EarthPlayer extends PlanetPlayer {
             this.podOrders.put(this.pods.get(0), Order.BUILD);
         } else {
             Set<Integer> bestPod = null;
-            int bestPodValue = -1;
+            int bestPodValue = Integer.MAX_VALUE;
             for (Set<Integer> pod : this.pods) {
-                this.podOrders.put(pod, Order.BUILD);
+                this.podOrders.put(pod, Order.MINE);
 
                 int meanX = 0;
                 int meanY = 0;
@@ -187,12 +187,12 @@ public class EarthPlayer extends PlanetPlayer {
                 meanY /= pod.size();
 
                 int value = getDepositValue(meanX, meanY, 5); // TODO
-                if (value > bestPodValue) {
+                if (value < bestPodValue) {
                     bestPodValue = value;
                     bestPod = pod;
                 }
             }
-            this.podOrders.put(bestPod, Order.MINE);
+            this.podOrders.put(bestPod, Order.BUILD);
         }
     }
 
@@ -317,6 +317,10 @@ public class EarthPlayer extends PlanetPlayer {
                     }
                     targetBuilding = this.podBuildingTargets.get(pod);
 
+                    if (targetBuilding == null) {
+                        break;
+                    }
+
                     Set<Integer> buildingPodToAddTo = null;
                     Unit buildingReplicatedUnit = null;
                     for (int unit : pod) {
@@ -378,6 +382,10 @@ public class EarthPlayer extends PlanetPlayer {
                     }
                     targetDeposit = this.podMiningTargets.get(pod);
                     // this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+
+                    if (targetDeposit == null) {
+                        break;
+                    }
 
                     Set<Integer> podToAddTo = null;
                     Unit replicatedUnit = null;
