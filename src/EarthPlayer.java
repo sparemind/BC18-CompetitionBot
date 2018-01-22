@@ -327,16 +327,28 @@ public class EarthPlayer extends PlanetPlayer {
                         MapLocation unitLoc = this.gc.unit(unit).location().mapLocation();
 
                         if (allFactoriesProducing && pod.size() < 4) { // TODO
-                            // Direction dirToReplicate = dirToTarget;
                             Direction dirToReplicate = null;
-                            // if (!this.gc.canReplicate(unit, dirToReplicate)) {
+
+                            // Try to replicate in a place next to the target building
+                            Unit targetUnit = this.gc.unit(targetBuilding);
+                            MapLocation targetLoc = targetUnit.location().mapLocation();
                             for (Direction d : DIRECTIONS) {
-                                if (this.gc.canReplicate(unit, d)) {
-                                    dirToReplicate = d;
+                                MapLocation targetAdj = targetLoc.add(d);
+                                Direction toTargetAdj = unitLoc.directionTo(targetAdj);
+                                if (this.gc.canReplicate(unit, toTargetAdj)) {
+                                    dirToReplicate = toTargetAdj;
                                     break;
                                 }
                             }
-                            // }
+                            if (dirToReplicate == null) {
+                                for (Direction d : DIRECTIONS) {
+                                    if (this.gc.canReplicate(unit, d)) {
+                                        dirToReplicate = d;
+                                        break;
+                                    }
+                                }
+                            }
+
                             if (dirToReplicate != null && this.gc.canReplicate(unit, dirToReplicate)) {
                                 this.gc.replicate(unit, dirToReplicate);
                                 buildingReplicatedUnit = this.gc.senseUnitAtLocation(unitLoc.add(dirToReplicate));
