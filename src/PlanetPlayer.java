@@ -31,7 +31,8 @@ public abstract class PlanetPlayer {
     protected GameController gc;
     // Map of all locations on the planet, represented as the amount of
     // karbonite at each location. -1 signifies impassable terrain.
-    protected int[][] map;
+    protected int[][] karboniteMap;
+    protected boolean[][] passableMap;
     protected int mapWidth;
     protected int mapHeight;
     protected Map<Point, Direction[][]> navMaps;
@@ -59,15 +60,17 @@ public abstract class PlanetPlayer {
         PlanetMap pm = gc.startingMap(planet);
         this.mapWidth = (int) pm.getWidth();
         this.mapHeight = (int) pm.getHeight();
-        this.map = new int[this.mapHeight][this.mapWidth];
+        this.karboniteMap = new int[this.mapHeight][this.mapWidth];
+        this.passableMap = new boolean[this.mapHeight][this.mapWidth];
         this.navMaps = new HashMap<>();
-        for (int y = 0; y < this.map.length; y++) {
-            for (int x = 0; x < this.map[y].length; x++) {
+        for (int y = 0; y < this.karboniteMap.length; y++) {
+            for (int x = 0; x < this.karboniteMap[y].length; x++) {
                 MapLocation loc = new MapLocation(planet, x, y);
+                this.karboniteMap[y][x] = (int) pm.initialKarboniteAt(loc);
                 if (pm.isPassableTerrainAt(loc) == 1) {
-                    this.map[y][x] = (int) pm.initialKarboniteAt(loc);
+                    this.passableMap[y][x] = true;
                 } else {
-                    this.map[y][x] = IMPASSABLE;
+                    this.passableMap[y][x] = false;
                 }
             }
         }

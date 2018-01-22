@@ -38,13 +38,13 @@ public class EarthPlayer extends PlanetPlayer {
     }
 
     private void initializeNavigator() {
-        boolean[][] passable = new boolean[this.mapHeight][this.mapWidth];
-        for (int y = 0; y < this.mapHeight; y++) {
-            for (int x = 0; x < this.mapWidth; x++) {
-                passable[y][x] = this.map[y][x] != IMPASSABLE;
-            }
-        }
-        this.navigator = new Navigator(this.gc, passable);
+        // boolean[][] passable = new boolean[this.mapHeight][this.mapWidth];
+        // for (int y = 0; y < this.mapHeight; y++) {
+        //     for (int x = 0; x < this.mapWidth; x++) {
+        //         passable[y][x] = this.karboniteMap[y][x] != IMPASSABLE;
+        //     }
+        // }
+        this.navigator = new Navigator(this.gc, this.passableMap);
 
         // this.navigator.precomputeNavMaps(this.gc.planet());
     }
@@ -57,7 +57,7 @@ public class EarthPlayer extends PlanetPlayer {
         for (int y = 0; y < this.mapHeight; y++) {
             for (int x = 0; x < this.mapWidth; x++) {
                 // Don't calculate deposits for impassable locations
-                if (this.map[y][x] == IMPASSABLE) {
+                if (!this.passableMap[y][x]) {
                     continue;
                 }
                 int value = getDepositValue(x, y, DEPOSIT_SCAN_RADIUS);
@@ -104,10 +104,10 @@ public class EarthPlayer extends PlanetPlayer {
                     continue;
                 }
                 // Don't add impassable locations to the total
-                if (this.map[yPos][xPos] == IMPASSABLE) {
+                if (!this.passableMap[yPos][xPos]) {
                     continue;
                 }
-                value += this.map[yPos][xPos];
+                value += this.karboniteMap[yPos][xPos];
             }
         }
 
@@ -197,7 +197,7 @@ public class EarthPlayer extends PlanetPlayer {
 
         while (!openSet.isEmpty()) {
             MapLocation next = openSet.remove();
-            if (this.map[next.getY()][next.getX()] > 0) {
+            if (this.karboniteMap[next.getY()][next.getX()] > 0) {
                 return next;
             }
 
@@ -207,7 +207,7 @@ public class EarthPlayer extends PlanetPlayer {
                 MapLocation adj = next.add(d);
                 int adjX = adj.getX();
                 int adjY = adj.getY();
-                if (isOOB(adjX, adjY) || this.map[adjY][adjX] == IMPASSABLE) {
+                if (isOOB(adjX, adjY) || !this.passableMap[adjY][adjX]) {
                     continue;
                 }
                 Point adjPoint = new Point(adj.getX(), adj.getY());
@@ -239,8 +239,13 @@ public class EarthPlayer extends PlanetPlayer {
                 continue;
             }
 
-            // TODO For mining: Occasionally update the entire karbonite map
-            // TODO so deposits mined by the enemy are updated and known
+            for (int y = 0; y < this.mapHeight; y++) {
+                for (int x = 0; x < this.mapWidth; x++) {
+                    if (this.gc.canSenseLocation(new MapLocation(Planet.Earth, x, y)))
+                        this.karboniteMap[y][x] = (int) Math.min(this.gc.karboniteAt(new MapLocation(Planet.Earth, x, y)), this.karboniteMap[y][x]);
+                }
+            }
+
             switch (order) {
                 case BUILD:
                     break;
@@ -248,7 +253,7 @@ public class EarthPlayer extends PlanetPlayer {
                     MapLocation targetDeposit = this.podTargets.get(pod);
                     // If this pod doesn't have a mining target, or if that
                     // target has run out of karbonite, find a new target
-                    if (targetDeposit == null || this.map[targetDeposit.getY()][targetDeposit.getX()] <= 0) {
+                    if (targetDeposit == null || this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] <= 0) {
                         int sampleUnit = pod.iterator().next();
                         for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.allUnits.get(sampleUnit).location().isInGarrison(); ) {
                             sampleUnit = it.next();
@@ -261,14 +266,14 @@ public class EarthPlayer extends PlanetPlayer {
                         this.podTargets.put(pod, nextDeposit);
                     }
                     targetDeposit = this.podTargets.get(pod);
-                    this.map[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+                    this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
                     for (int unit : pod) {
                         MapLocation unitLoc = this.allUnits.get(unit).location().mapLocation();
                         Direction dirToTarget = unitLoc.directionTo(targetDeposit);
                         // Try to mine the target
                         if (this.gc.canHarvest(unit, dirToTarget)) {
                             this.gc.harvest(unit, dirToTarget);
-                            this.map[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
+                            this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
                         } else {
                             // If it can't be mined, move in range so that it can be
                             Direction toMove = this.navigator.navigate(unit, unitLoc, targetDeposit);

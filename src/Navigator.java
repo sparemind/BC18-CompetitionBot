@@ -51,7 +51,7 @@ public class Navigator {
 
     private GameController gc;
     private Map<Point, Direction[][]> navMaps;
-    private Map<Point, int[][]> navMapDists;
+    // private Map<Point, int[][]> navMapDists;
     private boolean[][] passable;
     private int mapWidth;
     private int mapHeight;
@@ -63,7 +63,7 @@ public class Navigator {
     public Navigator(GameController gc, boolean[][] passable) {
         this.gc = gc;
         this.navMaps = new HashMap<>();
-        this.navMapDists = new HashMap<>();
+        // this.navMapDists = new HashMap<>();
         this.passable = passable;
         this.mapHeight = this.passable.length;
         this.mapWidth = this.passable[0].length;
@@ -91,13 +91,6 @@ public class Navigator {
             }
         }
 
-        // if (isVerticallySymmetric) {
-        //     this.symmetry = Navigator.Symmetry.VERTICAL;
-        // } else if (isHorizontallySymmetric) {
-        //     this.symmetry = Navigator.Symmetry.HORIZONTAL;
-        // } else {
-        //     this.symmetry = Navigator.Symmetry.ROTATED;
-        // }
         System.out.println("Symmetry: " + this.isVerticallySymmetric + ":" + this.isHorizontallySymmetric + ":" + this.isRotatedSymmetric);
     }
 
@@ -168,39 +161,39 @@ public class Navigator {
         return x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight;
     }
 
-    public void doNavigate(Set<Unit> units, MapLocation target) {
-        Map<Integer, Direction> directions = navigate(units, target);
-        for (int unit : directions.keySet()) {
-            if (this.gc.isMoveReady(unit) && this.gc.canMove(unit, directions.get(unit))) {
-                this.gc.moveRobot(unit, directions.get(unit));
-            }
-        }
-    }
-
-    public Map<Integer, Direction> navigate(Set<Unit> units, MapLocation target) {
-        Point targetPoint = new Point(target.getX(), target.getY());
-        ensureNavMap(target, targetPoint);
-        Map<Integer, Direction> directions = new HashMap<>();
-
-        Queue<Unit> orderedUnits = new PriorityQueue<>((u1, u2) -> {
-            MapLocation u1Loc = u1.location().mapLocation();
-            MapLocation u2Loc = u2.location().mapLocation();
-
-            int u1Dist = this.navMapDists.get(targetPoint)[u1Loc.getY()][u1Loc.getX()];
-            int u2Dist = this.navMapDists.get(targetPoint)[u2Loc.getY()][u2Loc.getX()];
-
-            return Integer.compare(u2Dist, u1Dist);
-        });
-        for (Unit unit : units) {
-            orderedUnits.add(unit);
-        }
-
-        for (Unit unit : orderedUnits) {
-            directions.put(unit.id(), navigate(unit.id(), unit.location().mapLocation(), target));
-        }
-
-        return directions;
-    }
+    // public void doNavigate(Set<Unit> units, MapLocation target) {
+    //     Map<Integer, Direction> directions = navigate(units, target);
+    //     for (int unit : directions.keySet()) {
+    //         if (this.gc.isMoveReady(unit) && this.gc.canMove(unit, directions.get(unit))) {
+    //             this.gc.moveRobot(unit, directions.get(unit));
+    //         }
+    //     }
+    // }
+    //
+    // public Map<Integer, Direction> navigate(Set<Unit> units, MapLocation target) {
+    //     Point targetPoint = new Point(target.getX(), target.getY());
+    //     ensureNavMap(target, targetPoint);
+    //     Map<Integer, Direction> directions = new HashMap<>();
+    //
+    //     Queue<Unit> orderedUnits = new PriorityQueue<>((u1, u2) -> {
+    //         MapLocation u1Loc = u1.location().mapLocation();
+    //         MapLocation u2Loc = u2.location().mapLocation();
+    //
+    //         int u1Dist = this.navMapDists.get(targetPoint)[u1Loc.getY()][u1Loc.getX()];
+    //         int u2Dist = this.navMapDists.get(targetPoint)[u2Loc.getY()][u2Loc.getX()];
+    //
+    //         return Integer.compare(u2Dist, u1Dist);
+    //     });
+    //     for (Unit unit : units) {
+    //         orderedUnits.add(unit);
+    //     }
+    //
+    //     for (Unit unit : orderedUnits) {
+    //         directions.put(unit.id(), navigate(unit.id(), unit.location().mapLocation(), target));
+    //     }
+    //
+    //     return directions;
+    // }
 
     private void ensureNavMap(MapLocation target, Point targetPoint) {
         if (!this.navMaps.containsKey(targetPoint)) {
@@ -280,28 +273,6 @@ public class Navigator {
         Point horzSymPoint = new Point(this.mapWidth - 1 - targetX, targetY);
         Point rotSymPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
 
-        // Point symmetricPoint = null;
-        // if (this.isVerticallySymmetric) {
-        //     symmetricPoint = new Point(targetX, this.mapHeight - 1 - targetY);
-        // }
-        // if (this.isHorizontallySymmetric) {
-        //     symmetricPoint = new Point(this.mapWidth - 1 - targetX, targetY);
-        // }
-        // if (this.isRotatedSymmetric) {
-        //     symmetricPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
-        // }
-        // switch (this.symmetry) {
-        //     case VERTICAL:
-        //         symmetricPoint = new Point(targetX, this.mapHeight - 1 - targetY);
-        //         break;
-        //     case HORIZONTAL:
-        //         symmetricPoint = new Point(this.mapWidth - 1 - targetX, targetY);
-        //         break;
-        //     case ROTATED:
-        //         symmetricPoint = new Point(this.mapWidth - 1 - targetX, this.mapHeight - 1 - targetY);
-        //         break;
-        // }
-
         navMap[targetY][targetX] = Direction.Center;
         // navMapDist[targetY][targetX] = 0;
 
@@ -339,20 +310,6 @@ public class Navigator {
                         rotSymNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
                         // symNavMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
                     }
-                    // switch (this.symmetry) {
-                    //     case VERTICAL:
-                    //         symNavMap[this.mapHeight - 1 - adjY][adjX] = DIR_VERT_MIRROR.get(navDir);
-                    //         symNavMapDist[this.mapHeight - 1 - adjY][adjX] = navMapDist[adjY][adjX];
-                    //         break;
-                    //     case HORIZONTAL:
-                    //         symNavMap[adjY][this.mapWidth - 1 - adjX] = DIR_HORZ_MIRROR.get(navDir);
-                    //         symNavMapDist[adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
-                    //         break;
-                    //     case ROTATED:
-                    //         symNavMap[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = d;
-                    //         symNavMapDist[this.mapHeight - 1 - adjY][this.mapWidth - 1 - adjX] = navMapDist[adjY][adjX];
-                    //         break;
-                    // }
                 }
             }
         }
