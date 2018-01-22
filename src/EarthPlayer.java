@@ -317,8 +317,33 @@ public class EarthPlayer extends PlanetPlayer {
                     }
                     targetBuilding = this.podBuildingTargets.get(pod);
 
+                    Set<Integer> buildingPodToAddTo = null;
+                    Unit buildingReplicatedUnit = null;
                     for (int unit : pod) {
                         MapLocation unitLoc = this.gc.unit(unit).location().mapLocation();
+
+                        if (allFactoriesProducing && pod.size() < 4) { // TODO
+                            // Direction dirToReplicate = dirToTarget;
+                            Direction dirToReplicate = null;
+                            // if (!this.gc.canReplicate(unit, dirToReplicate)) {
+                            for (Direction d : DIRECTIONS) {
+                                if (this.gc.canReplicate(unit, d)) {
+                                    dirToReplicate = d;
+                                    break;
+                                }
+                            }
+                            // }
+                            if (dirToReplicate != null && this.gc.canReplicate(unit, dirToReplicate)) {
+                                this.gc.replicate(unit, dirToReplicate);
+                                buildingReplicatedUnit = this.gc.senseUnitAtLocation(unitLoc.add(dirToReplicate));
+                                buildingPodToAddTo = pod;
+                                // if (pod.size() > 3) {
+                                //     podToAddTo = new HashSet<>();
+                                //     this.pods.add(podToAddTo);
+                                //     this.podOrders.put(podToAddTo, Order.MINE);
+                                // }
+                            }
+                        }
 
                         if (this.gc.canBuild(unit, targetBuilding)) {
                             this.gc.build(unit, targetBuilding);
@@ -329,12 +354,13 @@ public class EarthPlayer extends PlanetPlayer {
                             this.podBuildingIdle.put(pod, 0);
                         }
                     }
+
+                    if (buildingPodToAddTo != null) {
+                        buildingPodToAddTo.add(buildingReplicatedUnit.id());
+                        this.podsMap.put(buildingReplicatedUnit.id(), buildingPodToAddTo);
+                    }
                     break;
                 case MINE:
-                    // TODO
-                    // TODO Replicate when a surplus of karbonite is in the area
-                    // TODO Base it off some ratio of karbonite vs. # workers in pod
-
                     MapLocation targetDeposit = this.podMiningTargets.get(pod);
                     // If this pod doesn't have a mining target, or if that
                     // target has run out of karbonite, find a new target
