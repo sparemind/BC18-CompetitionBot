@@ -29,10 +29,15 @@ public abstract class PlanetPlayer {
     protected final Team ENEMY_TEAM;
     // This player's game controller
     protected GameController gc;
+    // The planet this player is on
+    protected Planet planet;
+    // The navigator for this player
+    protected Navigator navigator;
     // Map of all locations on the planet, represented as the amount of
     // karbonite at each location. -1 signifies impassable terrain.
     protected int[][] karboniteMap;
     protected boolean[][] passableMap;
+    protected boolean[][] factoryLocationMap;
     protected int mapWidth;
     protected int mapHeight;
     protected Map<Point, Direction[][]> navMaps;
@@ -49,6 +54,7 @@ public abstract class PlanetPlayer {
      */
     public PlanetPlayer(GameController gc, Planet planet) {
         this.gc = gc;
+        this.planet = planet;
         this.MY_TEAM = gc.team();
         if (this.MY_TEAM == Team.Blue) {
             this.ENEMY_TEAM = Team.Red;
@@ -56,12 +62,13 @@ public abstract class PlanetPlayer {
             this.ENEMY_TEAM = Team.Blue;
         }
 
-        // Create karbonite map
+        // Create planet maps
         PlanetMap pm = gc.startingMap(planet);
         this.mapWidth = (int) pm.getWidth();
         this.mapHeight = (int) pm.getHeight();
         this.karboniteMap = new int[this.mapHeight][this.mapWidth];
         this.passableMap = new boolean[this.mapHeight][this.mapWidth];
+        this.factoryLocationMap = new boolean[this.mapHeight][this.mapWidth];
         this.navMaps = new HashMap<>();
         for (int y = 0; y < this.karboniteMap.length; y++) {
             for (int x = 0; x < this.karboniteMap[y].length; x++) {
@@ -72,6 +79,15 @@ public abstract class PlanetPlayer {
                 } else {
                     this.passableMap[y][x] = false;
                 }
+            }
+        }
+
+        for (int y = 0; y < this.karboniteMap.length; y++) {
+            for (int x = 0; x < this.karboniteMap[y].length; x++) {
+                if (!this.passableMap[y][x]) {
+                    continue;
+                }
+                this.factoryLocationMap[y][x] = true;
             }
         }
 
@@ -125,6 +141,8 @@ public abstract class PlanetPlayer {
         for (UnitType type : UnitType.values()) {
             this.myUnits.put(type, new HashSet<>());
         }
+
+        this.navigator = new Navigator(gc, this.passableMap);
 
         System.out.println("Ending initialization with " + gc.getTimeLeftMs() + "ms remaining.");
     }
@@ -180,5 +198,20 @@ public abstract class PlanetPlayer {
      */
     protected boolean isOOB(int x, int y) {
         return x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight;
+    }
+
+    /**
+     * Attempts to move a unit to a given target.
+     *
+     * @param unitID The unit to move.
+     * @param target The target to move the given unit to.
+     */
+    protected void move(int unitID, MapLocation target) {
+        Unit unit = this.allUnits.get(unitID);
+        if (!unit.location().isOnMap()) {
+            return;
+        }
+        Direction toMove = this.navigator.navigate(unitID, unit.location().mapLocation(), target);
+        this.navigator.tryMove(unitID, toMove);
     }
 }

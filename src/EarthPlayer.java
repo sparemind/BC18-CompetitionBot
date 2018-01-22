@@ -25,29 +25,29 @@ public class EarthPlayer extends PlanetPlayer {
     // All worker pods
     private List<Set<Integer>> pods;
     private Map<Set<Integer>, Order> podOrders;
-    private Map<Set<Integer>, MapLocation> podTargets;
-    private Navigator navigator;
+    private Map<Set<Integer>, MapLocation> podMiningTargets;
+    private Map<Set<Integer>, Integer> podBuildingTargets;
 
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
 
-        initializeNavigator();
+        // initializeNavigator();
         findKarboniteDeposits();
         makePods();
         assignInitialPods();
     }
 
-    private void initializeNavigator() {
-        // boolean[][] passable = new boolean[this.mapHeight][this.mapWidth];
-        // for (int y = 0; y < this.mapHeight; y++) {
-        //     for (int x = 0; x < this.mapWidth; x++) {
-        //         passable[y][x] = this.karboniteMap[y][x] != IMPASSABLE;
-        //     }
-        // }
-        this.navigator = new Navigator(this.gc, this.passableMap);
-
-        // this.navigator.precomputeNavMaps(this.gc.planet());
-    }
+    // private void initializeNavigator() {
+    //     // boolean[][] passable = new boolean[this.mapHeight][this.mapWidth];
+    //     // for (int y = 0; y < this.mapHeight; y++) {
+    //     //     for (int x = 0; x < this.mapWidth; x++) {
+    //     //         passable[y][x] = this.karboniteMap[y][x] != IMPASSABLE;
+    //     //     }
+    //     // }
+    //     this.navigator = new Navigator(this.gc, this.passableMap);
+    //
+    //     // this.navigator.precomputeNavMaps(this.gc.planet());
+    // }
 
     private void findKarboniteDeposits() {
         this.depositMap = new int[this.mapHeight][this.mapWidth];
@@ -116,7 +116,8 @@ public class EarthPlayer extends PlanetPlayer {
 
     private void makePods() {
         this.podsMap = new HashMap<>();
-        this.podTargets = new HashMap<>();
+        this.podMiningTargets = new IdentityHashMap<>();
+        this.podBuildingTargets = new IdentityHashMap<>();
         this.pods = new ArrayList<>();
 
         Set<Integer> processed = new HashSet<>();
@@ -223,6 +224,16 @@ public class EarthPlayer extends PlanetPlayer {
 
     @Override
     public void processTurn() {
+
+        boolean allFactoriesProducing = true;
+        for (int factory : this.myUnits.get(UnitType.Factory)) {
+            Unit factoryUnit = this.allUnits.get(factory);
+            if (factoryUnit.isFactoryProducing() == 0) {
+                allFactoriesProducing = false;
+                break;
+            }
+        }
+
         for (Set<Integer> pod : this.pods) {
             Order order = this.podOrders.get(pod);
 
@@ -241,16 +252,56 @@ public class EarthPlayer extends PlanetPlayer {
 
             for (int y = 0; y < this.mapHeight; y++) {
                 for (int x = 0; x < this.mapWidth; x++) {
-                    if (this.gc.canSenseLocation(new MapLocation(Planet.Earth, x, y)))
-                        this.karboniteMap[y][x] = (int) Math.min(this.gc.karboniteAt(new MapLocation(Planet.Earth, x, y)), this.karboniteMap[y][x]);
+                    if (this.gc.canSenseLocation(new MapLocation(this.planet, x, y)))
+                        this.karboniteMap[y][x] = (int) Math.min(this.gc.karboniteAt(new MapLocation(this.planet, x, y)), this.karboniteMap[y][x]);
                 }
             }
 
             switch (order) {
                 case BUILD:
+                    Integer targetBuilding = this.podBuildingTargets.get(pod);
+                    // If this pod doesn't have a building target, or if that
+                    // target is built, find a new target
+                    if (targetBuilding == null || this.allUnits.get(targetBuilding).structureIsBuilt() == 1) {
+                        // Don't create more factories if the current ones are enough
+                        if (!allFactoriesProducing) {
+                            break;
+                        }
+
+                        int sampleUnit = pod.iterator().next();
+                        for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.allUnits.get(sampleUnit).location().isInGarrison(); ) {
+                            sampleUnit = it.next();
+                        }
+                        // If all units are garrisoned, don't do anything
+                        if (this.allUnits.get(sampleUnit).location().isInGarrison()) {
+                            break;
+                        }
+                        Unit blueprintingUnit = this.allUnits.get(sampleUnit);
+                        MapLocation unitLoc = blueprintingUnit.location().mapLocation();
+                        for (Direction d : DIRECTIONS) {
+                            if (this.gc.canBlueprint(sampleUnit, UnitType.Factory, d)) {
+                                this.gc.blueprint(sampleUnit, UnitType.Factory, d);
+                                Unit blueprint = this.gc.senseUnitAtLocation(unitLoc.add(d));
+                                this.podBuildingTargets.put(pod, blueprint.id());
+                                break;
+                            }
+                        }
+                    }
+                    targetBuilding = this.podBuildingTargets.get(pod);
+
+                    for (int unit : pod) {
+                        MapLocation unitLoc = this.allUnits.get(unit).location().mapLocation();
+
+                        if (this.gc.canBuild(unit, targetBuilding)) {
+                            this.gc.build(unit, targetBuilding);
+                        } else {
+                            Direction toMove = this.navigator.navigate(unit, unitLoc, this.gc.unit(targetBuilding).location().mapLocation());
+                            this.navigator.tryMove(unit, toMove);
+                        }
+                    }
                     break;
                 case MINE:
-                    MapLocation targetDeposit = this.podTargets.get(pod);
+                    MapLocation targetDeposit = this.podMiningTargets.get(pod);
                     // If this pod doesn't have a mining target, or if that
                     // target has run out of karbonite, find a new target
                     if (targetDeposit == null || this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] <= 0) {
@@ -258,14 +309,14 @@ public class EarthPlayer extends PlanetPlayer {
                         for (Iterator<Integer> it = pod.iterator(); it.hasNext() && this.allUnits.get(sampleUnit).location().isInGarrison(); ) {
                             sampleUnit = it.next();
                         }
-                        // If all units are garrisoned, don't to anything
+                        // If all units are garrisoned, don't do anything
                         if (this.allUnits.get(sampleUnit).location().isInGarrison()) {
                             break;
                         }
                         MapLocation nextDeposit = findNearestKarbonite(this.allUnits.get(sampleUnit).location().mapLocation());
-                        this.podTargets.put(pod, nextDeposit);
+                        this.podMiningTargets.put(pod, nextDeposit);
                     }
-                    targetDeposit = this.podTargets.get(pod);
+                    targetDeposit = this.podMiningTargets.get(pod);
                     this.karboniteMap[targetDeposit.getY()][targetDeposit.getX()] = (int) this.gc.karboniteAt(targetDeposit);
                     for (int unit : pod) {
                         MapLocation unitLoc = this.allUnits.get(unit).location().mapLocation();
@@ -284,10 +335,34 @@ public class EarthPlayer extends PlanetPlayer {
             }
         }
 
+        for (int factory : this.myUnits.get(UnitType.Factory)) {
+            Unit factoryUnit = this.allUnits.get(factory);
+            if (factoryUnit.structureIsBuilt() == 0) {
+                continue;
+            }
+
+            if (this.gc.canProduceRobot(factory, UnitType.Ranger)) {
+                this.gc.produceRobot(factory, UnitType.Ranger);
+            }
+
+            // VecUnitID garrisoned = factoryUnit.structureGarrison();
+            // for (int i = 0; i < garrisoned.size(); i++) {
+            for (Direction d : DIRECTIONS) {
+                if (this.gc.canUnload(factory, d)) {
+                    this.gc.unload(factory, d);
+                }
+            }
+            // }
+        }
+
+        for (int ranger : this.myUnits.get(UnitType.Ranger)) {
+            move(ranger, new MapLocation(this.planet, 10, 10));
+        }
+
 
         // int i = 0;
-        // // MapLocation[] targets = {new MapLocation(Planet.Earth, 18, 4), new MapLocation(Planet.Earth, 18, 15)};
-        // MapLocation[] targets = {new MapLocation(Planet.Earth, 10, 10)};
+        // // MapLocation[] targets = {new MapLocation(this.planet, 18, 4), new MapLocation(this.planet, 18, 15)};
+        // MapLocation[] targets = {new MapLocation(this.planet, 10, 10)};
         //
         // // Set<Unit> pod = new HashSet<>();
         // // for (int worker : this.myUnits.get(UnitType.Worker)) {
