@@ -28,7 +28,6 @@ public class EarthPlayer extends PlanetPlayer {
     private Map<Set<Integer>, MapLocation> podMiningTargets;
     private Map<Set<Integer>, Integer> podBuildingTargets;
     private Map<Set<Integer>, Integer> podBuildingIdle;
-    private List<MapLocation> attackPoints;
 
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
@@ -38,7 +37,6 @@ public class EarthPlayer extends PlanetPlayer {
         makePods();
         assignInitialPods();
 
-        this.attackPoints = new ArrayList<>();
         VecUnit initial = gc.startingMap(planet).getInitial_units();
         for (int i = 0; i < initial.size(); i++) {
             if (initial.get(i).team() == this.MY_TEAM) {
@@ -77,7 +75,9 @@ public class EarthPlayer extends PlanetPlayer {
                 sortedUniqueDeposits.add(value);
             }
         }
-        Integer[] sortedDeposits = sortedUniqueDeposits.toArray(new Integer[sortedUniqueDeposits.size()]);
+        // Integer[] sortedDeposits = sortedUniqueDeposits.toArray(new Integer[sortedUniqueDeposits.size()]);
+
+
         // System.out.println(Arrays.toString(sortedDeposits));
 
         // double mean = 0;
@@ -310,6 +310,10 @@ public class EarthPlayer extends PlanetPlayer {
                                 Unit blueprint = this.gc.senseUnitAtLocation(unitLoc.add(d));
                                 this.podBuildingTargets.put(pod, blueprint.id());
 
+                                if (this.base == null) {
+                                    this.base = blueprint.location().mapLocation();
+                                }
+
                                 this.podBuildingIdle.put(pod, 0);
                                 break;
                             }
@@ -507,11 +511,11 @@ public class EarthPlayer extends PlanetPlayer {
         }
 
         for (int ranger : this.myUnits.get(UnitType.Ranger)) {
-            move(ranger, new MapLocation(this.planet, 20, 21));
-
             if (!this.gc.unit(ranger).location().isOnMap()) {
                 continue;
             }
+
+            goodMove(ranger, this.rallyPoint);
 
             VecUnit nearby = this.gc.senseNearbyUnitsByTeam(this.gc.unit(ranger).location().mapLocation(), this.gc.unit(ranger).attackRange(), this.ENEMY_TEAM);
             for (int i = 0; i < nearby.size(); i++) {

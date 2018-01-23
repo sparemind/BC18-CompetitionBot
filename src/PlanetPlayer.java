@@ -1,8 +1,10 @@
 import bc.*;
 
 import java.awt.Point;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -47,6 +49,10 @@ public abstract class PlanetPlayer {
     protected Map<UnitType, Set<Integer>> myUnits;
     // Key: UnitType, Value: Set of all my units of that type
     protected Map<UnitType, Set<Integer>> oppUnits;
+    protected List<MapLocation> attackPoints;
+    protected MapLocation rallyPoint;
+    protected MapLocation base;
+    protected Map<Integer, Integer> stalemateTime;
 
     /**
      * Creates a new player.
@@ -71,7 +77,11 @@ public abstract class PlanetPlayer {
         this.impassablePoints = new HashSet<>();
         this.karboniteMap = new int[this.mapHeight][this.mapWidth];
         this.passableMap = new boolean[this.mapHeight][this.mapWidth];
+        this.attackPoints = new ArrayList<>();
+        this.rallyPoint = null;
+        this.base = null;
         this.factoryLocationMap = new boolean[this.mapHeight][this.mapWidth];
+        this.stalemateTime = new HashMap<>();
         for (int y = 0; y < this.karboniteMap.length; y++) {
             for (int x = 0; x < this.karboniteMap[y].length; x++) {
                 MapLocation loc = new MapLocation(planet, x, y);
@@ -152,6 +162,29 @@ public abstract class PlanetPlayer {
     }
 
     /**
+     * TODO
+     */
+    protected void nextRallyPoint() {
+        if (this.base == null) {
+            return;
+        }
+
+        if (this.attackPoints.isEmpty()) {
+            // TODO
+        } else {
+            long closestDistance = Integer.MAX_VALUE;
+
+            for (MapLocation candidate : this.attackPoints) {
+                long dist = this.base.distanceSquaredTo(candidate);
+                if (dist < closestDistance) {
+                    closestDistance = dist;
+                    this.rallyPoint = candidate;
+                }
+            }
+        }
+    }
+
+    /**
      * Processes any actions that must happen before a turn.
      */
     public void processPreTurn() {
@@ -170,6 +203,17 @@ public abstract class PlanetPlayer {
             if (unitLoc.isOnMap()) {
                 MapLocation unitMapLoc = unitLoc.mapLocation();
                 this.impassablePoints.add(new Point(unitMapLoc.getX(), unitMapLoc.getY()));
+
+                if (unit.team() == this.MY_TEAM) {
+                    for (int j = 0; j < this.attackPoints.size(); j++) {
+                        MapLocation m = this.attackPoints.get(j);
+                        if (m.getX() == unitMapLoc.getX() && m.getY() == unitMapLoc.getY()) {
+                            this.attackPoints.remove(j);
+                            nextRallyPoint();
+                            break;
+                        }
+                    }
+                }
             }
             if (unit.team() == this.MY_TEAM) {
                 this.myUnits.get(unit.unitType()).add(unit.id());
@@ -177,6 +221,10 @@ public abstract class PlanetPlayer {
                 this.oppUnits.get(unit.unitType()).add(unit.id());
             }
             this.allUnits.put(unit.id(), unit);
+        }
+
+        if (this.rallyPoint == null) {
+            nextRallyPoint();
         }
     }
 
@@ -186,6 +234,7 @@ public abstract class PlanetPlayer {
      * @param unitID The ID of the unit to check.
      * @return True if a unit of the given ID exists, false otherwise.
      */
+
     public boolean unitExists(int unitID) {
         return this.allUnits.containsKey(unitID);
     }
@@ -224,9 +273,40 @@ public abstract class PlanetPlayer {
         if (!unit.location().isOnMap()) {
             return;
         }
-        // Direction toMove = this.navigator.navigate(unitID, unit.location().mapLocation(), target);
-        MapLocation loc = unit.location().mapLocation();
-        Direction toMove = this.navigator.pathfind(new Point(loc.getX(), loc.getY()), new Point(target.getX(), target.getY()), this.passableMap, this.impassablePoints);
+        Direction toMove = this.navigator.navigate(unitID, unit.location().mapLocation(), target);
+        // MapLocation loc = unit.location().mapLocation();
+        // Direction toMove = this.navigator.pathfind(new Point(loc.getX(), loc.getY()), new Point(target.getX(), target.getY()), this.passableMap, this.impassablePoints);
+        this.navigator.tryMove(unitID, toMove);
+    }
+
+
+    /**
+     * Attempts to move a unit to a given target using a potentially more
+     * expensive navigator that accounts for unit locations.
+     *
+     * @param unitID The unit to move.
+     * @param target The target to move the given unit to.
+     */
+    protected void goodMove(int unitID, MapLocation target) {
+        Unit unit = this.allUnits.get(unitID);
+        if (!unit.location().isOnMap()) {
+            return;
+        }
+        if (!this.stalemateTime.containsKey(unitID)) {
+            this.stalemateTime.put(unitID, 0);
+        }
+        MapLocation unitLoc = unit.location().mapLocation();
+
+        Direction toMove = this.navigator.navigate(unitID, unit.location().mapLocation(), target);
+        if (!this.gc.canMove(unitID, toMove)) {
+            this.stalemateTime.put(unit.id(), this.stalemateTime.get(unit.id()) + 1);
+        } else {
+            this.stalemateTime.put(unitID, 0);
+        }
+        if (this.stalemateTime.get(unitID) > 5) { // TODO
+            toMove = this.navigator.pathfind(new Point(unitLoc.getX(), unitLoc.getY()), new Point(target.getX(), target.getY()), this.passableMap, this.impassablePoints);
+        }
+
         this.navigator.tryMove(unitID, toMove);
     }
 }
