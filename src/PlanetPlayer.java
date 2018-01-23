@@ -40,7 +40,7 @@ public abstract class PlanetPlayer {
     protected boolean[][] factoryLocationMap;
     protected int mapWidth;
     protected int mapHeight;
-    protected Map<Point, Direction[][]> navMaps;
+    protected Set<Point> impassablePoints;
     // Key: UnitID, Value: Unit
     protected Map<Integer, Unit> allUnits;
     // Key: UnitType, Value: Set of all my units of that type
@@ -68,10 +68,10 @@ public abstract class PlanetPlayer {
         PlanetMap pm = gc.startingMap(planet);
         this.mapWidth = (int) pm.getWidth();
         this.mapHeight = (int) pm.getHeight();
+        this.impassablePoints = new HashSet<>();
         this.karboniteMap = new int[this.mapHeight][this.mapWidth];
         this.passableMap = new boolean[this.mapHeight][this.mapWidth];
         this.factoryLocationMap = new boolean[this.mapHeight][this.mapWidth];
-        this.navMaps = new HashMap<>();
         for (int y = 0; y < this.karboniteMap.length; y++) {
             for (int x = 0; x < this.karboniteMap[y].length; x++) {
                 MapLocation loc = new MapLocation(planet, x, y);
@@ -161,10 +161,16 @@ public abstract class PlanetPlayer {
             this.oppUnits.get(type).clear();
         }
         this.allUnits.clear();
+        this.impassablePoints.clear();
 
         VecUnit units = this.gc.units();
         for (int i = 0; i < units.size(); i++) {
             Unit unit = units.get(i);
+            Location unitLoc = unit.location();
+            if (unitLoc.isOnMap()) {
+                MapLocation unitMapLoc = unitLoc.mapLocation();
+                this.impassablePoints.add(new Point(unitMapLoc.getX(), unitMapLoc.getY()));
+            }
             if (unit.team() == this.MY_TEAM) {
                 this.myUnits.get(unit.unitType()).add(unit.id());
             } else {
@@ -218,7 +224,9 @@ public abstract class PlanetPlayer {
         if (!unit.location().isOnMap()) {
             return;
         }
-        Direction toMove = this.navigator.navigate(unitID, unit.location().mapLocation(), target);
+        // Direction toMove = this.navigator.navigate(unitID, unit.location().mapLocation(), target);
+        MapLocation loc = unit.location().mapLocation();
+        Direction toMove = this.navigator.pathfind(new Point(loc.getX(), loc.getY()), new Point(target.getX(), target.getY()), this.passableMap, this.impassablePoints);
         this.navigator.tryMove(unitID, toMove);
     }
 }

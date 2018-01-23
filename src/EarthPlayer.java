@@ -366,8 +366,10 @@ public class EarthPlayer extends PlanetPlayer {
                             this.podBuildingIdle.put(pod, 0);
                         } else {
                             Direction toMove = this.navigator.navigate(unit, unitLoc, this.gc.unit(targetBuilding).location().mapLocation());
-                            this.navigator.tryMove(unit, toMove);
+                            boolean moved = this.navigator.tryMove(unit, toMove);
+                            // if (moved) {
                             this.podBuildingIdle.put(pod, 0);
+                            // }
                         }
                     }
 
@@ -505,7 +507,7 @@ public class EarthPlayer extends PlanetPlayer {
         }
 
         for (int ranger : this.myUnits.get(UnitType.Ranger)) {
-            move(ranger, new MapLocation(this.planet, 10, 10));
+            move(ranger, new MapLocation(this.planet, 20, 21));
 
             if (!this.gc.unit(ranger).location().isOnMap()) {
                 continue;

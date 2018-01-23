@@ -328,9 +328,10 @@ public class Navigator {
         // this.navMapDists.put(symmetricPoint, symNavMapDist);
     }
 
-    public Direction pathfind(Point start, Point target, boolean[][] map) {
+    public Direction pathfind(Point start, Point target, boolean[][] passable, Set<Point> impassable) {
         // TODO
-        map[target.y][target.x] = true;
+        passable[target.y][target.x] = true;
+        impassable.remove(target);
 
         PriorityQueue<Node> openSet = new PriorityQueue<>();
         Set<Node> closedSet = new HashSet<>();
@@ -369,7 +370,7 @@ public class Navigator {
 
             for (Node neighbor : neighbors) {
                 // Ignore already evaluated nodes and ones that aren't traversable
-                if (closedSet.contains(neighbor) || neighbor.point.x < 0 || neighbor.point.y < 0 || neighbor.point.x >= map[0].length || neighbor.point.y >= map.length || !map[neighbor.point.y][neighbor.point.x]) {
+                if (closedSet.contains(neighbor) || isOOB(neighbor.point.x, neighbor.point.y) || !passable[neighbor.point.y][neighbor.point.x] || impassable.contains(neighbor.point)) {
                     continue;
                 }
 
@@ -400,7 +401,7 @@ public class Navigator {
             }
         }
 
-        return null;
+        return Direction.Center;
     }
 
     /**
@@ -411,11 +412,12 @@ public class Navigator {
      * @return The direction to move from the start to get to the target.
      */
     private Direction calculateSolutionPath(Node target) {
-        Direction dir = null;
+        Direction dir = Direction.Center;
         while (target != null && target.fromParent != null) {
             dir = target.fromParent;
             target = target.cameFrom;
         }
+
         return dir;
     }
 
@@ -443,10 +445,6 @@ public class Navigator {
         int dx = Math.abs(p1.x - p2.x);
         int dy = Math.abs(p1.y - p2.y);
         return A_STAR_WEIGHT * ((dx + dy) + (SQRT2 - 2) * Math.min(dx, dy));
-    }
-
-    public enum Symmetry {
-        VERTICAL, HORIZONTAL, ROTATED
     }
 
     private static class Node implements Comparable<Node> {
