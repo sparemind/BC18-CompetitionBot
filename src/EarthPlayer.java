@@ -275,12 +275,44 @@ public class EarthPlayer extends PlanetPlayer {
             }
 
             switch (order) {
+                case ROCKET:
+                    for (int unit : pod) {
+                        boolean loaded = false;
+                        for (int rocket : this.myUnits.get(UnitType.Rocket)) {
+                            if (this.gc.unit(rocket).structureIsBuilt() == 1) {
+                                if (this.gc.canLoad(rocket, unit)) {
+                                    this.gc.load(rocket, unit);
+                                    loaded = true;
+                                }
+                            }
+                        }
+                        if (loaded) {
+                            continue;
+                        }
+
+                        boolean noRocket = true;
+                        for (int rocket : this.myUnits.get(UnitType.Rocket)) {
+                            if (this.gc.canBuild(unit, rocket)) {
+                                this.gc.build(unit, rocket);
+                                noRocket = false;
+                            }
+                        }
+                        if (noRocket) {
+                            for (Direction d : DIRECTIONS) {
+                                if (this.gc.canBlueprint(unit, UnitType.Rocket, d)) {
+                                    this.gc.blueprint(unit, UnitType.Rocket, d);
+                                }
+                            }
+                        }
+                    }
+                    break;
                 case BUILD:
                     if (!this.podBuildingIdle.containsKey(pod)) {
                         this.podBuildingIdle.put(pod, 0);
                     }
                     if (this.podBuildingIdle.get(pod) > 3) { // TODO
-                        this.podOrders.put(pod, Order.MINE);
+                        // this.podOrders.put(pod, Order.MINE);
+                        this.podOrders.put(pod, Order.ROCKET);
                         break;
                     }
                     this.podBuildingIdle.put(pod, this.podBuildingIdle.get(pod) + 1);
@@ -490,7 +522,26 @@ public class EarthPlayer extends PlanetPlayer {
             }
         }
 
+        for (int rocket : this.myUnits.get(UnitType.Rocket)) {
+            Veci32 teamArray = this.gc.getTeamArray(Planet.Mars);
+            if (this.gc.unit(rocket).structureGarrison().size() != 0) {
+                this.gc.launchRocket(rocket, new MapLocation(Planet.Mars, teamArray.get(0), teamArray.get(1)));
+                for (Set<Integer> pod : this.podOrders.keySet()) {
+                    if (this.podOrders.get(pod) == Order.ROCKET) {
+                        this.podOrders.put(pod, Order.MINE);
+                    }
+                }
+            }
+        }
+
         for (int factory : this.myUnits.get(UnitType.Factory)) {
+            // TODO
+            if (this.myUnits.get(UnitType.Rocket).isEmpty()) {
+                if (this.podOrders.values().contains(Order.ROCKET) && this.gc.karbonite() <= 100) {
+                    continue;
+                }
+            }
+
             Unit factoryUnit = this.gc.unit(factory);
             if (factoryUnit.structureIsBuilt() == 0) {
                 continue;
@@ -515,178 +566,58 @@ public class EarthPlayer extends PlanetPlayer {
                 continue;
             }
 
+            if (this.gc.unit(ranger).rangerIsSniping() == 1) {
+                continue;
+            }
+
             goodMove(ranger, this.rallyPoint);
 
-            VecUnit nearby = this.gc.senseNearbyUnitsByTeam(this.gc.unit(ranger).location().mapLocation(), this.gc.unit(ranger).attackRange(), this.ENEMY_TEAM);
-            for (int i = 0; i < nearby.size(); i++) {
-                if (this.gc.isAttackReady(ranger) && this.gc.canAttack(ranger, nearby.get(i).id())) {
-                    this.gc.attack(ranger, nearby.get(i).id());
+            if (this.gc.isAttackReady(ranger)) {
+                VecUnit nearby = this.gc.senseNearbyUnitsByTeam(this.gc.unit(ranger).location().mapLocation(), this.gc.unit(ranger).attackRange(), this.ENEMY_TEAM);
+                Unit targetUnit = null;
+                for (int i = 0; i < nearby.size(); i++) {
+                    if (this.gc.canAttack(ranger, nearby.get(i).id())) {
+                        if (targetUnit == null || nearby.get(i).health() < targetUnit.health()) {
+                            targetUnit = nearby.get(i);
+                        }
+                    }
                 }
-            }
-        }
-
-
-        // int i = 0;
-        // // MapLocation[] targets = {new MapLocation(this.planet, 18, 4), new MapLocation(this.planet, 18, 15)};
-        // MapLocation[] targets = {new MapLocation(this.planet, 10, 10)};
-        //
-        // // Set<Unit> pod = new HashSet<>();
-        // // for (int worker : this.myUnits.get(UnitType.Worker)) {
-        // //     pod.add(this.gc.unit(worker));
-        // // }
-        // // this.navigator.doNavigate(pod, targets[0]);
-        //
-        // for (int worker : this.myUnits.get(UnitType.Worker)) {
-        //     Unit workerUnit = this.gc.unit(worker);
-        //     MapLocation loc = workerUnit.location().mapLocation();
-        //
-        //     MapLocation target = targets[i % targets.length];
-        //
-        //     Direction toMove = this.navigator.navigate(worker, loc, target);
-        //     if (this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
-        //         this.gc.moveRobot(worker, toMove);
-        //     }
-        //     i++;
-        //
-        //
-        //     // VecUnit allUnits = this.gc.units();
-        //     // for (int i = 0; i < allUnits.size(); i++) {
-        //     //     Location l = allUnits.get(i).location();
-        //     //     if (l.isOnMap() && !l.isInGarrison()) {
-        //     //         MapLocation ml = l.mapLocation();
-        //     //         navMap[ml.getY()][ml.getX()] = false;
-        //     //     }
-        //     // }
-        //     // // for (boolean[] b : navMap) {
-        //     // //     for (boolean bb : b) {
-        //     // //         System.out.print(bb ? "." : "#");
-        //     // //     }
-        //     // // }
-        //     // // System.out.println();
-        //     //
-        //     // Direction toMove = nav.pathfind(new Point(loc.getX(), loc.getY()), new Point(18, 10), navMap);
-        //     // if (toMove != null && this.gc.isMoveReady(worker) && this.gc.canMove(worker, toMove)) {
-        //     //     this.gc.moveRobot(worker, toMove);
-        //     // }
-        // }
-
-        // VecUnit is a class that you can think of as similar to ArrayList<Unit>, but immutable.
-        // VecUnit units = this.gc.myUnits();
-        // for (int i = 0; i < units.size(); i++) {
-        //     Unit unit = units.get(i);
-        //
-        //     Direction[][] navMap = this.navMaps.get(new Point(10, 10));
-        //     MapLocation loc = unit.location().mapLocation();
-        //     int unitX = loc.getX();
-        //     int unitY = loc.getY();
-        //     Direction nextDir = navMap[unitY][unitX];
-        //     if (this.gc.isMoveReady(unit.id()) && this.gc.canMove(unit.id(), nextDir)) {
-        //         this.gc.moveRobot(unit.id(), nextDir);
-        //     }
-        //
-        // }
-
-
-        /*
-        for (int worker : this.myUnits.get(UnitType.Worker)) {
-            // if (this.gc.karbonite() > bc.bcUnitTypeBlueprintCost(UnitType.Factory)) {
-            Unit workerUnit = this.gc.unit(worker);
-            if (workerUnit.location().isInGarrison()) {
-                continue;
-            }
-            MapLocation loc = workerUnit.location().mapLocation();
-
-            for (int factory : this.myUnits.get(UnitType.Factory)) {
-                if (this.gc.canBuild(worker, factory)) {
-                    this.gc.build(worker, factory);
+                if (targetUnit != null) {
+                    this.gc.attack(ranger, targetUnit.id());
                 }
             }
 
-            for (Direction d : DIRECTIONS) {
-                MapLocation adj = loc.add(d);
-                if (!isOOB(adj.getX(), adj.getY()) && this.map[adj.getY()][adj.getX()] == 0 && this.gc.canBlueprint(worker, UnitType.Factory, d)) {
-                    this.gc.blueprint(worker, UnitType.Factory, d);
-                    break;
-                }
-                if (!isOOB(adj.getX(), adj.getY()) && this.gc.canHarvest(worker, d)) {
-                    this.gc.harvest(worker, d);
-                    break;
-                }
-            }
+            // if (this.gc.isBeginSnipeReady(ranger) && this.gc.unit(ranger).rangerIsSniping() == 0) {
+            //     MapLocation snipeTarget = getSnipeTarget();
+            //
+            //     if (snipeTarget != null && this.gc.canBeginSnipe(ranger, snipeTarget)) {
+            //         this.gc.beginSnipe(ranger, snipeTarget);
+            //     }
             // }
         }
+    }
 
-        for (int ranger : this.myUnits.get(UnitType.Ranger)) {
-            Unit rangerUnit = this.gc.unit(ranger);
-            if (rangerUnit.location().isInGarrison()) {
-                continue;
-            }
-            MapLocation loc = rangerUnit.location().mapLocation();
+    private MapLocation getSnipeTarget() {
+        if (this.attackPoints.isEmpty()) {
+            return null;
+        }
 
-            VecUnit rawTargets = this.gc.senseNearbyUnitsByType(loc, rangerUnit.attackRange(), UnitType.Factory);
-            List<Unit> targets = new ArrayList<>();
-            for (int i = 0; i < rawTargets.size(); i++) {
-                if (rawTargets.get(i).team() == this.ENEMY_TEAM) {
-                    targets.add(rawTargets.get(i));
-                }
-            }
-            if (targets.isEmpty()) {
-                rawTargets = this.gc.senseNearbyUnitsByTeam(loc, rangerUnit.attackRange(), this.ENEMY_TEAM);
-                for (int i = 0; i < rawTargets.size(); i++) {
-                    targets.add(rawTargets.get(i));
-                }
-            }
-            Unit closestTarget = null;
-            long closestDistance = Long.MAX_VALUE;
-            for (int i = 0; i < targets.size(); i++) {
-                Unit target = targets.get(i);
-                MapLocation targetLoc = target.location().mapLocation();
-                long distance = loc.distanceSquaredTo(targetLoc);
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestTarget = target;
-                }
-            }
-            if (closestTarget != null) {
-                if (this.gc.canAttack(ranger, closestTarget.id()) && rangerUnit.attackHeat() < 10) {
-                    this.gc.attack(ranger, closestTarget.id());
-                }
+        MapLocation attackPoint = this.attackPoints.get(0);
+        long bestDist = this.base.distanceSquaredTo(attackPoint);
+        for (int i = 1; i < this.attackPoints.size(); i++) {
+            long dist = this.base.distanceSquaredTo(this.attackPoints.get(i));
+            if (dist < bestDist) {
+                attackPoint = this.attackPoints.get(i);
+                bestDist = dist;
             }
         }
 
-        for (int factory : this.myUnits.get(UnitType.Factory)) {
-            Unit factoryUnit = this.gc.unit(factory);
-            MapLocation loc = factoryUnit.location().mapLocation();
-
-            boolean freeSurroundings = false;
-            for (Direction d : DIRECTIONS) {
-                if (this.gc.canUnload(factory, d)) {
-                    this.gc.unload(factory, d);
-                }
-                MapLocation adj = loc.add(d);
-                if (isOOB(adj.getX(), adj.getY())) {
-                    continue;
-                }
-                if (this.gc.isOccupiable(adj) == 1) {
-                    freeSurroundings = true;
-                    break;
-                }
-            }
-            // Don't make stuff if you can't unload it
-            if (!freeSurroundings) {
-                continue;
-            }
-            if (Math.random() < 0.5) {
-                if (this.gc.canProduceRobot(factory, UnitType.Worker)) {
-                    this.gc.produceRobot(factory, UnitType.Worker);
-                }
-            } else {
-                if (this.gc.canProduceRobot(factory, UnitType.Ranger)) {
-                    this.gc.produceRobot(factory, UnitType.Ranger);
-                }
-            }
+        int dx = 1000;
+        int dy = 1000;
+        while (isOOB(attackPoint.getX() + dx, attackPoint.getY() + dy)) {
+            dx = ((int) Math.random() * 4) - 2;
+            dy = ((int) Math.random() * 4) - 2;
         }
-
-        */
+        return new MapLocation(this.planet, attackPoint.getX() + dx, attackPoint.getY() + dy);
     }
 }

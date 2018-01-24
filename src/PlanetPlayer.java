@@ -303,7 +303,7 @@ public abstract class PlanetPlayer {
         } else {
             this.stalemateTime.put(unitID, 0);
         }
-        if (this.stalemateTime.get(unitID) > 5) { // TODO
+        if (this.stalemateTime.get(unitID) > 5 && this.gc.getTimeLeftMs() > 10000) { // TODO
             toMove = this.navigator.pathfind(new Point(unitLoc.getX(), unitLoc.getY()), new Point(target.getX(), target.getY()), this.passableMap, this.impassablePoints);
         }
 

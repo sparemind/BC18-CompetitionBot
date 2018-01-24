@@ -22,6 +22,11 @@ public class Player {
         } else {
             this.player = new MarsPlayer(this.gc, planet);
         }
+
+        this.gc.queueResearch(UnitType.Ranger);
+        this.gc.queueResearch(UnitType.Ranger);
+        this.gc.queueResearch(UnitType.Ranger);
+        this.gc.queueResearch(UnitType.Rocket);
     }
 
     public static void main(String[] args) {

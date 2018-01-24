@@ -1,3 +1,3 @@
 public enum Order {
-    BUILD, MINE
+    BUILD, MINE, ROCKET
 }
