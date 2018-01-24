@@ -445,27 +445,26 @@ public class EarthPlayer extends PlanetPlayer {
 
                         if (!this.myUnits.get(UnitType.Factory).isEmpty() && allFactoriesProducing) {
                             int value = getDepositValue(unitLoc.getX(), unitLoc.getY(), 3); // TODO
-                            if (value / pod.size() <= 100) {
-                                continue;
-                            }
-                            Direction dirToReplicate = dirToTarget;
-                            if (!this.gc.canReplicate(unit, dirToReplicate)) {
-                                for (Direction d : DIRECTIONS) {
-                                    if (this.gc.canReplicate(unit, d)) {
-                                        dirToReplicate = d;
-                                        break;
+                            if (value / pod.size() > 100) { // TODO
+                                Direction dirToReplicate = dirToTarget;
+                                if (!this.gc.canReplicate(unit, dirToReplicate)) {
+                                    for (Direction d : DIRECTIONS) {
+                                        if (this.gc.canReplicate(unit, d)) {
+                                            dirToReplicate = d;
+                                            break;
+                                        }
                                     }
                                 }
-                            }
-                            if (this.gc.canReplicate(unit, dirToReplicate)) {
-                                this.gc.replicate(unit, dirToReplicate);
-                                replicatedUnit = this.gc.senseUnitAtLocation(unitLoc.add(dirToReplicate));
-                                podToAddTo = pod;
-                                // if (pod.size() > 3) {
-                                //     podToAddTo = new HashSet<>();
-                                //     this.pods.add(podToAddTo);
-                                //     this.podOrders.put(podToAddTo, Order.MINE);
-                                // }
+                                if (this.gc.canReplicate(unit, dirToReplicate)) {
+                                    this.gc.replicate(unit, dirToReplicate);
+                                    replicatedUnit = this.gc.senseUnitAtLocation(unitLoc.add(dirToReplicate));
+                                    podToAddTo = pod;
+                                    // if (pod.size() > 3) {
+                                    //     podToAddTo = new HashSet<>();
+                                    //     this.pods.add(podToAddTo);
+                                    //     this.podOrders.put(podToAddTo, Order.MINE);
+                                    // }
+                                }
                             }
                         }
 
