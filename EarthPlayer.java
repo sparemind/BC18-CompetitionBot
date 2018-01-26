@@ -28,6 +28,7 @@ public class EarthPlayer extends PlanetPlayer {
     private Map<Set<Integer>, MapLocation> podMiningTargets;
     private Map<Set<Integer>, Integer> podBuildingTargets;
     private Map<Set<Integer>, Integer> podBuildingIdle;
+    private boolean firstFactoryBuilt;
 
     public EarthPlayer(GameController gc, Planet planet) {
         super(gc, planet);
@@ -35,7 +36,12 @@ public class EarthPlayer extends PlanetPlayer {
         // initializeNavigator();
         findKarboniteDeposits();
         makePods();
-        assignInitialPods();
+        this.firstFactoryBuilt = false;
+        this.podOrders = new IdentityHashMap<>();
+        for (Set<Integer> pod : this.pods) {
+            this.podOrders.put(pod, Order.MINE);
+        }
+        // assignInitialPods();
 
         VecUnit initial = gc.startingMap(planet).getInitial_units();
         for (int i = 0; i < initial.size(); i++) {
@@ -167,8 +173,6 @@ public class EarthPlayer extends PlanetPlayer {
     }
 
     private void assignInitialPods() {
-        this.podOrders = new IdentityHashMap<>();
-
         if (this.pods.size() == 1) {
             this.podOrders.put(this.pods.get(0), Order.BUILD);
         } else {
@@ -236,6 +240,14 @@ public class EarthPlayer extends PlanetPlayer {
 
     @Override
     public void processTurn() {
+
+        if (!this.firstFactoryBuilt) {
+            if (this.gc.karbonite() > 200) {
+                this.firstFactoryBuilt = true;
+                assignInitialPods();
+            }
+        }
+
 
         boolean allFactoriesProducing = true;
         boolean allFactoriesBuilt = true;
@@ -315,7 +327,9 @@ public class EarthPlayer extends PlanetPlayer {
                         this.podOrders.put(pod, Order.ROCKET);
                         break;
                     }
-                    this.podBuildingIdle.put(pod, this.podBuildingIdle.get(pod) + 1);
+                    if (this.myUnits.get(UnitType.Factory).size() != 0) {
+                        this.podBuildingIdle.put(pod, this.podBuildingIdle.get(pod) + 1);
+                    }
 
                     Integer targetBuilding = this.podBuildingTargets.get(pod);
                     // If this pod doesn't have a building target, or if that
