@@ -240,7 +240,6 @@ public class EarthPlayer extends PlanetPlayer {
 
     @Override
     public void processTurn() {
-
         if (!this.firstFactoryBuilt) {
             if (this.gc.karbonite() > 200) {
                 this.firstFactoryBuilt = true;
@@ -327,9 +326,9 @@ public class EarthPlayer extends PlanetPlayer {
                         this.podOrders.put(pod, Order.ROCKET);
                         break;
                     }
-                    if (this.myUnits.get(UnitType.Factory).size() != 0) {
-                        this.podBuildingIdle.put(pod, this.podBuildingIdle.get(pod) + 1);
-                    }
+                    // if (this.myUnits.get(UnitType.Factory).size() != 0) {
+                    this.podBuildingIdle.put(pod, this.podBuildingIdle.get(pod) + 1);
+                    // }
 
                     Integer targetBuilding = this.podBuildingTargets.get(pod);
                     // If this pod doesn't have a building target, or if that
@@ -417,9 +416,9 @@ public class EarthPlayer extends PlanetPlayer {
                         } else {
                             Direction toMove = this.navigator.navigate(unit, unitLoc, this.gc.unit(targetBuilding).location().mapLocation());
                             boolean moved = this.navigator.tryMove(unit, toMove);
-                            // if (moved) {
-                            this.podBuildingIdle.put(pod, 0);
-                            // }
+                            if (moved) {
+                                this.podBuildingIdle.put(pod, 0);
+                            }
                         }
                     }
 

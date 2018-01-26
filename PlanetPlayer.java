@@ -170,7 +170,18 @@ public abstract class PlanetPlayer {
         }
 
         if (this.attackPoints.isEmpty()) {
-            // TODO
+            for (int u : this.allUnits.keySet()) {
+                Unit unit = this.gc.unit(u);
+                if (unit.team() == this.ENEMY_TEAM) {
+                    Location loc = unit.location();
+                    if (loc.isOnMap()) {
+                        MapLocation mapLoc = loc.mapLocation();
+                        this.attackPoints.add(mapLoc);
+                        this.rallyPoint = mapLoc;
+                        break;
+                    }
+                }
+            }
         } else {
             long closestDistance = Integer.MAX_VALUE;
 
